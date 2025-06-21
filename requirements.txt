@@ -1,0 +1,35 @@
+# Yêu cầu hệ thống cho Ứng dụng Chỉnh sửa Video Tự động
+
+# Core dependencies
+ffmpeg-python>=0.2.0
+moviepy>=1.0.3
+
+# Speech-to-Text libraries
+openai-whisper>=20230314
+SpeechRecognition>=3.10.0
+pydub>=0.25.1
+
+# Translation libraries
+googletrans==4.0.0rc1
+requests>=2.28.0
+
+# Audio processing
+librosa>=0.9.0
+soundfile>=0.12.0
+
+# Image and video processing
+opencv-python>=4.7.0
+Pillow>=9.0.0
+
+# Utility libraries
+numpy>=1.21.0
+pandas>=1.5.0
+tqdm>=4.64.0
+
+# Optional: Advanced STT (nếu muốn sử dụng các engine khác)
+# azure-cognitiveservices-speech>=1.24.0
+# google-cloud-speech>=2.16.0
+
+# Optional: Alternative translation services
+# deepl>=1.12.0
+# azure-translator-text>=3.0.0
