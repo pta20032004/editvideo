@@ -20,7 +20,7 @@ CHROMA_COLORS = {
     "black": "0x000000"       # Đen
 }
 
-# Preset độ nhạy chroma key cải tiến
+# Không cần thiết nữa
 CHROMA_PRESETS = {
     "loose": (0.3, 0.3),         # Độ nhạy thấp - loại bỏ ít màu
     "custom": (0.2, 0.2),        # Độ nhạy lí tưởng cho GREEN
@@ -31,11 +31,110 @@ CHROMA_PRESETS = {
     "perfect": (0.001, 0.001)    # Độ nhạy hoàn hảo - khử tuyệt đối
 }
 
+def test_get_video_duration(video_path):
+    """Test function to debug video duration detection"""
+    print(f"Testing video duration for: {video_path}")
+    
+    # Method 1: Try ffprobe
+    try:
+        cmd = ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', video_path]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            duration = float(result.stdout.strip())
+            print(f"Method 1 (ffprobe): {duration:.2f}s")
+            return duration
+    except Exception as e:
+        print(f"Method 1 failed: {e}")
+    
+    # Method 2: Try ffmpeg
+    try:
+        ffmpeg_path = find_ffmpeg()
+        ffprobe_path = ffmpeg_path.replace('ffmpeg', 'ffprobe') if 'ffmpeg' in ffmpeg_path else 'ffprobe'
+        cmd = [ffprobe_path, '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', video_path]
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        if result.returncode == 0:
+            duration = float(result.stdout.strip())
+            print(f"Method 2 (ffprobe from ffmpeg path): {duration:.2f}s")
+            return duration
+    except Exception as e:
+        print(f"Method 2 failed: {e}")
+    
+    # Method 3: Try ffmpeg info
+    try:
+        ffmpeg_path = find_ffmpeg()
+        cmd = [ffmpeg_path, '-i', video_path, '-f', 'null', '-']
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        # Parse duration from stderr
+        import re
+        duration_match = re.search(r'Duration: (\d+):(\d+):(\d+)\.(\d+)', result.stderr)
+        if duration_match:
+            hours, minutes, seconds, milliseconds = duration_match.groups()
+            total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds) + int(milliseconds) / 100
+            print(f"Method 3 (ffmpeg parse): {total_seconds:.2f}s")
+            return total_seconds
+    except Exception as e:
+        print(f"Method 3 failed: {e}")
+    
+    print("All methods failed!")
+    return None
+
+def get_video_duration(video_path):
+    """Lấy duration của video bằng ffprobe"""
+    try:
+        # Method 1: Try ffprobe directly
+        try:
+            cmd = ['ffprobe', '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', video_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 and result.stdout.strip():
+                duration = float(result.stdout.strip())
+                print(f"Video duration for {os.path.basename(video_path)}: {duration:.2f}s")
+                return duration
+        except Exception as e:
+            print(f"ffprobe direct failed: {e}")
+        
+        # Method 2: Try ffprobe from ffmpeg path
+        try:
+            ffmpeg_path = find_ffmpeg()
+            ffprobe_path = ffmpeg_path.replace('ffmpeg', 'ffprobe') if 'ffmpeg' in ffmpeg_path else 'ffprobe'
+            cmd = [ffprobe_path, '-v', 'quiet', '-show_entries', 'format=duration', '-of', 'csv=p=0', video_path]
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            if result.returncode == 0 and result.stdout.strip():
+                duration = float(result.stdout.strip())
+                print(f"Video duration for {os.path.basename(video_path)}: {duration:.2f}s")
+                return duration
+        except Exception as e:
+            print(f"ffprobe from ffmpeg path failed: {e}")
+        
+        # Method 3: Parse from ffmpeg output
+        try:
+            ffmpeg_path = find_ffmpeg()
+            cmd = [ffmpeg_path, '-i', video_path, '-f', 'null', '-']
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=10)
+            
+            # Parse duration from stderr
+            import re
+            duration_match = re.search(r'Duration: (\d+):(\d+):(\d+)\.(\d+)', result.stderr)
+            if duration_match:
+                hours, minutes, seconds, milliseconds = duration_match.groups()
+                total_seconds = int(hours) * 3600 + int(minutes) * 60 + int(seconds) + int(milliseconds) / 100
+                print(f"Video duration for {os.path.basename(video_path)}: {total_seconds:.2f}s (parsed)")
+                return total_seconds
+        except Exception as e:
+            print(f"ffmpeg parse failed: {e}")
+        
+        print(f"Could not get video duration for {video_path}")
+        return None
+        
+    except Exception as e:
+        print(f"Could not get video duration: {e}")
+        return None
+    
 def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_path, 
                                  start_time=0, duration=None, position="center", 
                                  size_percent=30, chroma_key=True, chroma_color="0x00ff00",
                                  chroma_similarity=0.1, chroma_blend=0.1, 
-                                 color=None, similarity=None):
+                                 color=None, similarity=None, auto_hide=True):
     """
     Chèn video overlay vào video chính với tùy chọn chroma key nâng cao
     
@@ -44,7 +143,7 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         overlay_video_path (str): Đường dẫn video overlay
         output_path (str): Đường dẫn lưu kết quả
         start_time (float): Thời gian bắt đầu (giây)
-        duration (float): Thời lượng hiển thị (None = toàn bộ video)
+        duration (float): Thời lượng hiển thị tối đa (None = toàn bộ video)
         position (str): Vị trí ('center', 'top-left', 'top-right', 'bottom-left', 'bottom-right')
         size_percent (int): Kích thước theo % chiều cao video chính
         chroma_key (bool): Có áp dụng chroma key không
@@ -53,6 +152,7 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         chroma_blend (float): Độ mờ biên (0.01-0.5, càng nhỏ càng sắc nét)
         color (str): Alias cho chroma_color (để tương thích ngược)
         similarity (float): Alias cho chroma_similarity (để tương thích ngược)
+        auto_hide (bool): Tự động ẩn khi video overlay kết thúc
     """
     # DEBUG: In ra tất cả parameters nhận được
     print(f"DEBUG OVERLAY: Received params:")
@@ -61,6 +161,7 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
     print(f"  chroma_blend={chroma_blend}")
     print(f"  color={color}")
     print(f"  similarity={similarity}")
+    print(f"  auto_hide={auto_hide}")
     
     # Hỗ trợ tương thích ngược với tham số từ test_chroma_key.py
     if color is not None:
@@ -90,6 +191,27 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
     try:
         # Tìm FFmpeg
         ffmpeg_path = find_ffmpeg()
+        
+        # Calculate actual overlay duration if auto_hide is enabled
+        if auto_hide:
+            overlay_duration = get_video_duration(overlay_video_path)
+            if overlay_duration:
+                if duration:
+                    # Use the shorter of: user-specified duration or actual video duration
+                    actual_duration = min(duration, overlay_duration)
+                else:
+                    # Use actual video duration
+                    actual_duration = overlay_duration
+                
+                print(f"Auto-hide enabled: overlay duration={overlay_duration:.2f}s, using duration={actual_duration:.2f}s")
+            else:
+                # Fallback to user duration if can't get video duration
+                actual_duration = duration
+                print(f"Could not get overlay duration, using user duration={duration}")
+        else:
+            # Use user-specified duration (original behavior)
+            actual_duration = duration
+            print(f"Auto-hide disabled, using user duration={duration}")
         
         # Tính toán vị trí
         if position == "center":
@@ -127,9 +249,9 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         else:
             overlay_input = "scaled"
         
-        # Tạo overlay với thời gian
-        if duration:
-            end_time = start_time + duration
+        # Tạo overlay với thời gian (NEW: use actual_duration)
+        if actual_duration:
+            end_time = start_time + actual_duration
             time_condition = f"enable='between(t,{start_time},{end_time})'"
         else:
             time_condition = f"enable='gte(t,{start_time})'"
@@ -153,7 +275,10 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         print(f"🎬 Đang chèn video overlay...")
         print(f"📂 Video chính: {main_video_path}")
         print(f"🎭 Video overlay: {overlay_video_path}")
-        print(f"⏰ Thời gian: {start_time}s - {start_time + duration if duration else 'hết video'}s")
+        if auto_hide and actual_duration:
+            print(f"⏰ Thời gian: {start_time}s - {start_time + actual_duration:.2f}s (auto-hide)")
+        else:
+            print(f"⏰ Thời gian: {start_time}s - {start_time + (actual_duration or 0):.2f}s")
         print(f"📍 Vị trí: {position}")
         print(f"📏 Kích thước: {size_percent}%")
         print(f"🔥 Chroma key: {'Có' if chroma_key else 'Không'}")

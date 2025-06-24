@@ -12,6 +12,16 @@ import sys
 import glob
 from pathlib import Path
 
+OPTIMAL_CHROMA_REMOVAL = {
+    "green": (0.2, 0.15),    # Green optimized từ testing
+    "blue": (0.18, 0.12),    # Blue cần tolerance cao hơn
+    "black": (0.01, 0.005),  # Black cần precision
+    "white": (0.02, 0.01),   # White precision nhưng không khắt khe như black
+    "cyan": (0.12, 0.08),    # Cyan dễ key
+    "red": (0.25, 0.2),      # Red khó key nhất
+    "magenta": (0.18, 0.12), # Tương tự blue
+    "yellow": (0.22, 0.18)   # Khó vì conflict với skin tone
+}
 # Import main application
 try:
     from main import AutoVideoEditor
@@ -464,7 +474,7 @@ class VideoEditorGUI:
         
         dialog = tk.Toplevel(self.root)
         dialog.title("Cấu hình Video Overlay + Chroma Key")
-        dialog.geometry("550x600")
+        dialog.geometry("500x600")
         dialog.transient(self.root)
         dialog.grab_set()
         
@@ -479,7 +489,12 @@ class VideoEditorGUI:
         size_var = tk.StringVar(value="25")
         chroma_enabled_var = tk.BooleanVar(value=True)
         chroma_color_var = tk.StringVar(value="green")
-        sensitivity_var = tk.StringVar(value="custom")
+        advanced_mode_var = tk.BooleanVar(value=False)
+        auto_hide_var = tk.BooleanVar(value=True)  # NEW: Default to auto hide
+        
+        # Advanced controls (hidden by default)
+        custom_similarity_var = tk.DoubleVar(value=0.2)
+        custom_blend_var = tk.DoubleVar(value=0.15)
 
         # --- Nạp lại cấu hình đã lưu nếu có ---
         if self.video_overlay_settings.get('enabled', False):
@@ -501,6 +516,8 @@ class VideoEditorGUI:
                 chroma_enabled_var.set(prev['chroma_key'])
             if prev.get('chroma_color'):
                 chroma_color_var.set(prev['chroma_color'])
+            if prev.get('auto_hide') is not None:
+                auto_hide_var.set(prev['auto_hide'])
 
         # --- Widgets ---
         ttk.Label(main_frame, text="Chọn video overlay:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
@@ -511,39 +528,129 @@ class VideoEditorGUI:
         if video_var.get() == "" and video_files:
             video_combo.current(0)
 
+        # FIXED: Use consistent pack layout for timing section
         timing_frame = ttk.LabelFrame(main_frame, text="Thời gian", padding="10")
         timing_frame.pack(fill=tk.X, pady=(0, 10))
-        timing_grid = ttk.Frame(timing_frame)
-        timing_grid.pack(fill=tk.X)
-        ttk.Label(timing_grid, text="Bắt đầu (giây):").grid(row=0, column=0, sticky=tk.W, pady=2)
-        ttk.Entry(timing_grid, textvariable=start_var, width=10).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
-        ttk.Label(timing_grid, text="Thời lượng (giây):").grid(row=1, column=0, sticky=tk.W, pady=2)
-        ttk.Entry(timing_grid, textvariable=duration_var, width=10).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+        
+        # Start time
+        start_frame = ttk.Frame(timing_frame)
+        start_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(start_frame, text="Bắt đầu (giây):").pack(side=tk.LEFT)
+        ttk.Entry(start_frame, textvariable=start_var, width=10).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Duration
+        duration_frame = ttk.Frame(timing_frame)
+        duration_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(duration_frame, text="Thời lượng tối đa (giây):").pack(side=tk.LEFT)
+        ttk.Entry(duration_frame, textvariable=duration_var, width=10).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # FIXED: Auto hide option using pack
+        auto_hide_frame = ttk.Frame(timing_frame)
+        auto_hide_frame.pack(fill=tk.X, pady=(10, 0))
+        ttk.Checkbutton(auto_hide_frame, 
+                    text="Tự động ẩn khi video overlay chạy hết", 
+                    variable=auto_hide_var).pack(anchor=tk.W)
+        ttk.Label(auto_hide_frame, 
+                text="(Tránh bị đứng hình ở frame cuối)", 
+                font=("Arial", 8), foreground="gray").pack(anchor=tk.W, padx=(20, 0))
         
         layout_frame = ttk.LabelFrame(main_frame, text="Vị trí & Kích thước", padding="10")
         layout_frame.pack(fill=tk.X, pady=(0, 10))
-        layout_grid = ttk.Frame(layout_frame)
-        layout_grid.pack(fill=tk.X)
-        ttk.Label(layout_grid, text="Vị trí:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        ttk.Combobox(layout_grid, textvariable=position_var, 
-                    values=["center", "top-left", "top-right", "bottom-left", "bottom-right"], 
-                    state="readonly", width=15).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
-        ttk.Label(layout_grid, text="Kích thước (% chiều cao):").grid(row=1, column=0, sticky=tk.W, pady=2)
-        ttk.Entry(layout_grid, textvariable=size_var, width=10).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
         
-        chroma_frame = ttk.LabelFrame(main_frame, text="Chroma Key", padding="10")
+        # Position
+        pos_frame = ttk.Frame(layout_frame)
+        pos_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(pos_frame, text="Vị trí:").pack(side=tk.LEFT)
+        ttk.Combobox(pos_frame, textvariable=position_var, 
+                    values=["center", "top-left", "top-right", "bottom-left", "bottom-right"], 
+                    state="readonly", width=15).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Size
+        size_frame = ttk.Frame(layout_frame)
+        size_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(size_frame, text="Kích thước (% chiều cao):").pack(side=tk.LEFT)
+        ttk.Entry(size_frame, textvariable=size_var, width=10).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Simplified Chroma Key section
+        chroma_frame = ttk.LabelFrame(main_frame, text="Xóa nền (Chroma Key)", padding="10")
         chroma_frame.pack(fill=tk.X, pady=(0, 10))
-        ttk.Checkbutton(chroma_frame, text="Bật chroma key (xóa nền)", variable=chroma_enabled_var).pack(anchor=tk.W)
-        chroma_grid = ttk.Frame(chroma_frame)
-        chroma_grid.pack(fill=tk.X, pady=(5, 0))
-        ttk.Label(chroma_grid, text="Màu nền:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        ttk.Combobox(chroma_grid, textvariable=chroma_color_var,
-                    values=["green", "blue", "cyan", "red", "magenta", "black", "yellow"],
-                    state="readonly", width=10).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
-        ttk.Label(chroma_grid, text="Độ nhạy:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        ttk.Combobox(chroma_grid, textvariable=sensitivity_var,
-                    values=["loose", "normal", "custom", "strict", "very_strict", "ultra_strict"],
-                    state="readonly", width=12).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+        
+        # Enable chroma key
+        ttk.Checkbutton(chroma_frame, text="Xóa nền video overlay", variable=chroma_enabled_var).pack(anchor=tk.W, pady=(0, 10))
+        
+        # Color selection
+        color_frame = ttk.Frame(chroma_frame)
+        color_frame.pack(fill=tk.X, pady=(0, 10))
+        ttk.Label(color_frame, text="Chọn màu nền cần xóa:").pack(side=tk.LEFT)
+        color_combo = ttk.Combobox(color_frame, textvariable=chroma_color_var,
+                    values=["green", "blue", "black", "white", "cyan", "red", "magenta", "yellow"],
+                    state="readonly", width=12)
+        color_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Current settings display
+        settings_label = ttk.Label(chroma_frame, text="", font=("Arial", 9), foreground="blue")
+        settings_label.pack(anchor=tk.W)
+        
+        # Update settings display when color changes
+        def update_settings_display(*args):
+            color = chroma_color_var.get()
+            if color in OPTIMAL_CHROMA_REMOVAL:
+                similarity, blend = OPTIMAL_CHROMA_REMOVAL[color]
+                settings_label.config(text=f"Tự động áp dụng: Similarity={similarity}, Blend={blend}")
+                # Update custom controls
+                custom_similarity_var.set(similarity)
+                custom_blend_var.set(blend)
+            else:
+                settings_label.config(text="Sử dụng settings mặc định")
+                custom_similarity_var.set(0.15)
+                custom_blend_var.set(0.1)
+        
+        chroma_color_var.trace('w', update_settings_display)
+        update_settings_display()  # Initial update
+        
+        # Advanced mode toggle
+        ttk.Checkbutton(chroma_frame, text="Hiển thị cài đặt nâng cao", variable=advanced_mode_var).pack(anchor=tk.W, pady=(10, 0))
+        
+        # Advanced controls frame (initially hidden)
+        advanced_frame = ttk.Frame(chroma_frame)
+        
+        # Similarity control
+        sim_frame = ttk.Frame(advanced_frame)
+        sim_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(sim_frame, text="Similarity:").pack(side=tk.LEFT)
+        similarity_scale = ttk.Scale(sim_frame, from_=0.001, to=0.5, variable=custom_similarity_var, orient=tk.HORIZONTAL, length=150)
+        similarity_scale.pack(side=tk.LEFT, padx=(10, 5))
+        similarity_value_label = ttk.Label(sim_frame, text="0.200")
+        similarity_value_label.pack(side=tk.LEFT)
+        
+        # Blend control
+        blend_frame = ttk.Frame(advanced_frame)
+        blend_frame.pack(fill=tk.X, pady=2)
+        ttk.Label(blend_frame, text="Blend:").pack(side=tk.LEFT)
+        blend_scale = ttk.Scale(blend_frame, from_=0.001, to=0.5, variable=custom_blend_var, orient=tk.HORIZONTAL, length=150)
+        blend_scale.pack(side=tk.LEFT, padx=(10, 5))
+        blend_value_label = ttk.Label(blend_frame, text="0.150")
+        blend_value_label.pack(side=tk.LEFT)
+        
+        # Update value labels
+        def update_similarity_label(*args):
+            similarity_value_label.config(text=f"{custom_similarity_var.get():.3f}")
+        def update_blend_label(*args):
+            blend_value_label.config(text=f"{custom_blend_var.get():.3f}")
+        
+        custom_similarity_var.trace('w', update_similarity_label)
+        custom_blend_var.trace('w', update_blend_label)
+        
+        # Show/hide advanced controls
+        def toggle_advanced_mode(*args):
+            if advanced_mode_var.get():
+                advanced_frame.pack(fill=tk.X, pady=(5, 0))
+            else:
+                advanced_frame.pack_forget()
+                # Reset to optimal values when hiding
+                update_settings_display()
+        
+        advanced_mode_var.trace('w', toggle_advanced_mode)
         
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=(10, 0))
@@ -566,18 +673,18 @@ class VideoEditorGUI:
                 duration = float(duration_var.get()) if duration_var.get().strip() else None
                 size = int(size_var.get())
                 
-                # Lấy color và sensitivity preset
+                # Lấy chroma settings
                 chroma_color = chroma_color_var.get()
-                chroma_preset = sensitivity_var.get()
                 
-                # DEBUG: In ra giá trị trước khi convert
-                print(f"DEBUG GUI: chroma_color={chroma_color}, chroma_preset={chroma_preset}")
-                
-                # Convert preset to actual values dựa vào màu
-                similarity, blend = self._get_chroma_values_for_preset(chroma_color, chroma_preset)
-                
-                # DEBUG: In ra giá trị sau khi convert
-                print(f"DEBUG GUI: similarity={similarity}, blend={blend}")
+                if advanced_mode_var.get():
+                    # Use custom values from sliders
+                    similarity = custom_similarity_var.get()
+                    blend = custom_blend_var.get()
+                    print(f"DEBUG GUI: Using advanced mode - similarity={similarity}, blend={blend}")
+                else:
+                    # Use optimal values for selected color
+                    similarity, blend = OPTIMAL_CHROMA_REMOVAL.get(chroma_color, (0.15, 0.1))
+                    print(f"DEBUG GUI: Using optimal for {chroma_color} - similarity={similarity}, blend={blend}")
                 
                 self.video_overlay_settings = {
                     'enabled': True,
@@ -589,19 +696,21 @@ class VideoEditorGUI:
                     'chroma_key': chroma_enabled_var.get(),
                     'chroma_color': chroma_color,
                     'chroma_similarity': similarity,
-                    'chroma_blend': blend
+                    'chroma_blend': blend,
+                    'auto_hide': auto_hide_var.get()  # NEW: Save auto hide setting
                 }
                 
                 # DEBUG: In ra toàn bộ settings
                 print(f"DEBUG GUI: video_overlay_settings={self.video_overlay_settings}")
                 
                 # Update status message
+                auto_hide_text = " (auto-hide)" if auto_hide_var.get() else " (freeze)"
                 self.video_overlay_status.config(
-                    text=f"Đã cấu hình video overlay: {selected_video} (chroma: {chroma_color}, {similarity:.3f})", 
+                    text=f"Đã cấu hình: {selected_video} | {chroma_color} ({similarity:.3f}, {blend:.3f}){auto_hide_text}", 
                     foreground="green"
                 )
                 
-                self.log_message(f"Saved chroma settings: color={chroma_color}, similarity={similarity}, blend={blend}")
+                self.log_message(f"Saved chroma: {chroma_color} với optimal settings ({similarity:.3f}, {blend:.3f}), auto_hide={auto_hide_var.get()}")
                 dialog.destroy()
                 
             except Exception as e:
