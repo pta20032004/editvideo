@@ -23,9 +23,10 @@ CHROMA_COLORS = {
 # Preset độ nhạy chroma key cải tiến
 CHROMA_PRESETS = {
     "loose": (0.3, 0.3),         # Độ nhạy thấp - loại bỏ ít màu
+    "custom": (0.2, 0.2),        # Độ nhạy lí tưởng cho GREEN
     "normal": (0.1, 0.1),        # Độ nhạy bình thường - cân bằng
     "strict": (0.05, 0.05),      # Độ nhạy cao - loại bỏ nhiều màu
-    "very_strict": (0.01, 0.01), # Độ nhạy rất cao - rất nghiêm ngặt
+    "very_strict": (0.01, 0.01), # Độ nhạy rất cao - rất nghiêm ngặt BLACK
     "ultra_strict": (0.005, 0.005), # Độ nhạy cực cao - khử hoàn toàn
     "perfect": (0.001, 0.001)    # Độ nhạy hoàn hảo - khử tuyệt đối
 }
@@ -352,7 +353,7 @@ def get_chroma_preset(preset_name):
     Returns:
         tuple: (similarity, blend)
     """
-    return CHROMA_PRESETS.get(preset_name.lower(), (0.1, 0.1))
+    return CHROMA_PRESETS.get(preset_name.lower(), (0.2, 0.2))
 
 def add_video_overlay_easy_chroma(main_video_path, overlay_video_path, output_path,
                                  start_time=0, duration=None, position="center", 

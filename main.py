@@ -275,7 +275,8 @@ class AutoVideoEditor:
             "cyan": "0x00ffff",
             "red": "0xff0000",
             "magenta": "0xff00ff",
-            "yellow": "0xffff00"
+            "yellow": "0xffff00",
+            "black": "0x000000",
         }
         return colors.get(color_name.lower(), "0x00ff00")
     
@@ -284,9 +285,9 @@ class AutoVideoEditor:
         presets = {
             "loose": (0.3, 0.3),
             "normal": (0.1, 0.1),
-            "custom": (0.2, 0.2),
+            "custom": (0.2, 0.2), #Green
             "strict": (0.05, 0.05),
-            "very_strict": (0.01, 0.01),
+            "very_strict": (0.01, 0.01), #Black
             "ultra_strict": (0.005, 0.005)
         }
         return presets.get(preset_name.lower(), (0.01, 0.01))

@@ -461,6 +461,7 @@ class VideoEditorGUI:
     
     def show_video_overlay_dialog(self, video_files):
         """Dialog cấu hình video overlay"""
+        
         dialog = tk.Toplevel(self.root)
         dialog.title("🎬 Cấu hình Video Overlay + Chroma Key")
         dialog.geometry("550x600")
@@ -470,77 +471,82 @@ class VideoEditorGUI:
         main_frame = ttk.Frame(dialog, padding="10")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
-        # Video selection
-        ttk.Label(main_frame, text="🎭 Chọn video overlay:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
-        
+        # --- Các biến control ---
         video_var = tk.StringVar()
+        start_var = tk.StringVar(value="2")
+        duration_var = tk.StringVar(value="10")
+        position_var = tk.StringVar(value="top-right")
+        size_var = tk.StringVar(value="25")
+        chroma_enabled_var = tk.BooleanVar(value=True)
+        chroma_color_var = tk.StringVar(value="no select")
+        sensitivity_var = tk.StringVar(value="no select")
+
+        # --- Nạp lại cấu hình đã lưu nếu có ---
+        if self.video_overlay_settings.get('enabled', False):
+            prev = self.video_overlay_settings
+            if prev.get('video_path'):
+                video_basename = os.path.basename(prev['video_path'])
+                all_basenames = [os.path.basename(f) for f in video_files]
+                if video_basename in all_basenames:
+                    video_var.set(video_basename)
+            if prev.get('start_time') is not None:
+                start_var.set(str(prev['start_time']))
+            if prev.get('duration') is not None:
+                duration_var.set(str(prev['duration']))
+            if prev.get('position'):
+                position_var.set(prev['position'])
+            if prev.get('size_percent') is not None:
+                size_var.set(str(prev['size_percent']))
+            if prev.get('chroma_key') is not None:
+                chroma_enabled_var.set(prev['chroma_key'])
+            if prev.get('chroma_color'):
+                chroma_color_var.set(prev['chroma_color'])
+            if prev.get('chroma_sensitivity'):
+                sensitivity_var.set(prev['chroma_sensitivity'])
+
+        # --- Widgets ---
+        ttk.Label(main_frame, text="🎭 Chọn video overlay:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
         video_combo = ttk.Combobox(main_frame, textvariable=video_var, 
-                                  values=[os.path.basename(f) for f in video_files], 
-                                  state="readonly")
+                                values=[os.path.basename(f) for f in video_files], 
+                                state="readonly")
         video_combo.pack(fill=tk.X, pady=(0, 10))
-        if video_files:
+        if video_var.get() == "" and video_files:
             video_combo.current(0)
-        
-        # Timing
+
         timing_frame = ttk.LabelFrame(main_frame, text="⏰ Thời gian", padding="10")
         timing_frame.pack(fill=tk.X, pady=(0, 10))
-        
         timing_grid = ttk.Frame(timing_frame)
         timing_grid.pack(fill=tk.X)
-        
         ttk.Label(timing_grid, text="Bắt đầu (giây):").grid(row=0, column=0, sticky=tk.W, pady=2)
-        start_var = tk.StringVar(value="2")
         ttk.Entry(timing_grid, textvariable=start_var, width=10).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
-        
         ttk.Label(timing_grid, text="Thời lượng (giây):").grid(row=1, column=0, sticky=tk.W, pady=2)
-        duration_var = tk.StringVar(value="10")
         ttk.Entry(timing_grid, textvariable=duration_var, width=10).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
         
-        # Layout
         layout_frame = ttk.LabelFrame(main_frame, text="📍 Vị trí & Kích thước", padding="10")
         layout_frame.pack(fill=tk.X, pady=(0, 10))
-        
         layout_grid = ttk.Frame(layout_frame)
         layout_grid.pack(fill=tk.X)
-        
         ttk.Label(layout_grid, text="Vị trí:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        position_var = tk.StringVar(value="top-right")
         ttk.Combobox(layout_grid, textvariable=position_var, 
                     values=["center", "top-left", "top-right", "bottom-left", "bottom-right"], 
                     state="readonly", width=15).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
-        
         ttk.Label(layout_grid, text="Kích thước (% chiều cao):").grid(row=1, column=0, sticky=tk.W, pady=2)
-        size_var = tk.StringVar(value="25")
         ttk.Entry(layout_grid, textvariable=size_var, width=10).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
         
-        # Chroma key
         chroma_frame = ttk.LabelFrame(main_frame, text="🔥 Chroma Key", padding="10")
         chroma_frame.pack(fill=tk.X, pady=(0, 10))
-        
-        chroma_enabled_var = tk.BooleanVar(value=True)
         ttk.Checkbutton(chroma_frame, text="Bật chroma key (xóa nền)", variable=chroma_enabled_var).pack(anchor=tk.W)
         chroma_grid = ttk.Frame(chroma_frame)
         chroma_grid.pack(fill=tk.X, pady=(5, 0))
-        
         ttk.Label(chroma_grid, text="Màu nền:").grid(row=0, column=0, sticky=tk.W, pady=2)
-        chroma_color_var = tk.StringVar(value="green")
         ttk.Combobox(chroma_grid, textvariable=chroma_color_var,
-                    values=["green", "blue", "cyan", "red", "magenta"],
+                    values=["green", "blue", "cyan", "red", "magenta", "black", "yellow"],
                     state="readonly", width=10).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
-        
         ttk.Label(chroma_grid, text="Độ nhạy:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        sensitivity_var = tk.StringVar(value="custom")
         ttk.Combobox(chroma_grid, textvariable=sensitivity_var,
-                    values=["loose", "normal", "strict", "very_strict", "ultra_strict", "custom"],
+                    values=["loose", "normal", "strict", "very_strict (Black)", "ultra_strict", "custom (Green)"],
                     state="readonly", width=12).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
-
         
-        # Thêm nút tạo nhiều overlay
-        ttk.Label(chroma_grid, text="").grid(row=2, column=0, pady=5)  # Spacer
-        ttk.Button(chroma_grid, text="➕ Tạo overlay giống ảnh 2,3", 
-                  command=lambda: self.create_multiple_overlays(video_var.get())).grid(row=3, column=0, columnspan=2, pady=5)
-        
-        # Buttons
         button_frame = ttk.Frame(main_frame)
         button_frame.pack(fill=tk.X, pady=(10, 0))
         
@@ -550,18 +556,15 @@ class VideoEditorGUI:
                 if not selected_video:
                     messagebox.showerror("Lỗi", "Vui lòng chọn video!")
                     return
-                
-                start_time = float(start_var.get())
-                duration = float(duration_var.get()) if duration_var.get().strip() else None
-                size = int(size_var.get())
-                
-                # Tìm đường dẫn video
+                # Tìm đường dẫn video gốc từ tên file
                 video_path = None
                 for f in video_files:
                     if os.path.basename(f) == selected_video:
                         video_path = f
                         break
-                
+                start_time = float(start_var.get())
+                duration = float(duration_var.get()) if duration_var.get().strip() else None
+                size = int(size_var.get())
                 self.video_overlay_settings = {
                     'enabled': True,
                     'video_path': video_path,
@@ -573,22 +576,13 @@ class VideoEditorGUI:
                     'chroma_color': chroma_color_var.get(),
                     'chroma_sensitivity': sensitivity_var.get()
                 }
-                
-                duration_text = f"{start_time}s-{start_time+duration}s" if duration else f"{start_time}s-end"
-                self.video_overlay_status.config(text=f"✅ {selected_video} ({duration_text})", foreground="green")
-                
-                self.log_message(f"🎬 Đã cấu hình video overlay: {selected_video}")
-                self.log_message(f"   • Thời gian: {duration_text}")
-                self.log_message(f"   • Vị trí: {position_var.get()}, Kích thước: {size}%")
-                self.log_message(f"   • Chroma key: {'Có' if chroma_enabled_var.get() else 'Không'}")
-                
                 dialog.destroy()
-                
-            except ValueError as e:
+            except Exception as e:
                 messagebox.showerror("Lỗi", f"Giá trị không hợp lệ: {e}")
-        
+
         ttk.Button(button_frame, text="✅ Lưu", command=save_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="❌ Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
+
 
     def create_multiple_overlays(self, selected_video):
         """Tạo cấu hình multiple video overlay giống ảnh 2, 3"""
