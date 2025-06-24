@@ -47,7 +47,8 @@ class AutoVideoEditor:
             print("🎵 Bước 1: Trích xuất audio từ video...")
             audio_path = os.path.join(temp_dir, "extracted_audio.wav")
             self.video_processor.extract_audio(input_video_path, audio_path)
-              # Bước 2: Tạo phụ đề từ audio
+            
+            # Bước 2: Tạo phụ đề từ audio
             print("📝 Bước 2: Tạo phụ đề từ audio...")
             original_subtitle_path = os.path.join(temp_dir, "original_subtitle.srt")
             self.subtitle_generator.generate_subtitle(
@@ -56,7 +57,8 @@ class AutoVideoEditor:
                 language=source_language,
                 words_per_line=words_per_line
             )
-              # Bước 3: Dịch phụ đề sang ngôn ngữ đích
+            
+            # Bước 3: Dịch phụ đề sang ngôn ngữ đích
             print(f"🌐 Bước 3: Dịch phụ đề từ {source_language} sang {target_language}...")
             translated_subtitle_path = os.path.join(temp_dir, f"{target_language}_subtitle.srt")
             self.translator.translate_subtitle(
@@ -64,12 +66,19 @@ class AutoVideoEditor:
                 translated_subtitle_path,
                 source_lang=source_language,
                 target_lang=target_language
-            )            # Bước 4: Ghép phụ đề và overlay vào video
+            )
+            
+            # Bước 4: Ghép phụ đề và overlay vào video
             print("🎞️ Bước 4: Ghép phụ đề và overlay vào video...")
             video_with_subtitle_path = os.path.join(temp_dir, "video_with_subtitle.mp4")
-              # Xử lý video overlay nếu có
+            
+            # Xử lý video overlay nếu có
             if video_overlay_settings and video_overlay_settings.get('enabled', False):
                 print("🎬 Đang xử lý video overlay với chroma key...")
+                
+                # DEBUG: In ra toàn bộ video_overlay_settings
+                print(f"DEBUG MAIN: video_overlay_settings={video_overlay_settings}")
+                
                 try:
                     temp_video_overlay_path = os.path.join(temp_dir, "temp_with_video_overlay.mp4")
                     
@@ -85,9 +94,25 @@ class AutoVideoEditor:
                             temp_dir
                         )
                     else:
-                        # Xử lý single overlay (cũ)
+                        # Xử lý single overlay (từ GUI)
                         from video_overlay import add_video_overlay_with_chroma
                         settings = video_overlay_settings
+                        
+                        # DEBUG: In ra settings được truyền vào
+                        print(f"DEBUG MAIN: Single overlay settings={settings}")
+                        
+                        # Lấy chroma parameters từ GUI settings
+                        chroma_color = settings.get('chroma_color', 'green')
+                        chroma_similarity = settings.get('chroma_similarity', 0.2)
+                        chroma_blend = settings.get('chroma_blend', 0.15)
+                        
+                        # DEBUG: In ra chroma values
+                        print(f"DEBUG MAIN: chroma_color={chroma_color}, similarity={chroma_similarity}, blend={chroma_blend}")
+                        
+                        # Convert color name to hex
+                        if not str(chroma_color).startswith('0x'):
+                            chroma_color = self._get_chroma_color(chroma_color)
+                        
                         add_video_overlay_with_chroma(
                             main_video_path=input_video_path,
                             overlay_video_path=settings['video_path'],
@@ -97,9 +122,9 @@ class AutoVideoEditor:
                             position=settings.get('position', 'top-right'),
                             size_percent=settings.get('size_percent', 25),
                             chroma_key=settings.get('chroma_key', True),
-                            chroma_color=self._get_chroma_color(settings.get('chroma_color', 'green')),
-                            chroma_similarity=self._get_chroma_sensitivity(settings.get('chroma_sensitivity', 'very_strict'))[0],
-                            chroma_blend=self._get_chroma_sensitivity(settings.get('chroma_sensitivity', 'very_strict'))[1]
+                            chroma_color=chroma_color,
+                            chroma_similarity=chroma_similarity,
+                            chroma_blend=chroma_blend
                         )
                     
                     # Sau đó thêm phụ đề và image overlay lên video đã có video overlay
@@ -136,7 +161,8 @@ class AutoVideoEditor:
                             translated_subtitle_path,
                             video_with_subtitle_path
                         )
-              # Xử lý image overlay và phụ đề (nếu không có video overlay)
+            
+            # Xử lý image overlay và phụ đề (nếu không có video overlay)
             elif img_folder and os.path.exists(img_folder):
                 # Kiểm tra nếu sử dụng custom timeline
                 if custom_timeline:
@@ -215,7 +241,8 @@ class AutoVideoEditor:
             )
             
             print(f"✅ Hoàn thành! Video đã được lưu tại: {output_video_path}")
-              # Dọn dẹp thư mục tạm
+            
+            # Dọn dẹp thư mục tạm
             import shutil
             shutil.rmtree(temp_dir)
             print("🧹 Đã dọn dẹp thư mục tạm")
@@ -223,7 +250,6 @@ class AutoVideoEditor:
         except Exception as e:
             print(f"❌ Lỗi trong quá trình xử lý: {str(e)}")
             raise
-
     def _process_multiple_video_overlays(self, input_video_path, output_path, settings_list, temp_dir):
         """Xử lý nhiều video overlay"""
         current_video = input_video_path
@@ -231,21 +257,31 @@ class AutoVideoEditor:
         for i, settings in enumerate(settings_list):
             temp_output = os.path.join(temp_dir, f"temp_overlay_{i}.mp4")
             
-            print(f"🎬 Áp dụng video overlay {i+1}/{len(settings_list)}...")
+            print(f"Áp dụng video overlay {i+1}/{len(settings_list)}...")
             
             from video_overlay import add_video_overlay_with_chroma
             
-            # Xử lý chroma color và similarity
+            # Xử lý chroma parameters từ GUI
             chroma_color = settings.get('chroma_color', 'green')
-            chroma_similarity = settings.get('chroma_similarity', 0.25)
+            chroma_similarity = settings.get('chroma_similarity', 0.2)
+            chroma_blend = settings.get('chroma_blend', 0.15)
             
-            # Nếu chroma_color là string preset, chuyển đổi
-            if not chroma_color.startswith('0x'):
+            print(f"Processing chroma: color={chroma_color}, similarity={chroma_similarity}, blend={chroma_blend}")
+            
+            # Convert color name to hex nếu cần
+            if not str(chroma_color).startswith('0x'):
                 chroma_color = self._get_chroma_color(chroma_color)
             
-            # Nếu chroma_similarity là string preset, chuyển đổi  
-            if isinstance(chroma_similarity, str):
-                chroma_similarity = self._get_chroma_sensitivity(chroma_similarity)[0]
+            # Đảm bảo similarity và blend là số
+            try:
+                if isinstance(chroma_similarity, str):
+                    chroma_similarity = float(chroma_similarity)
+                if isinstance(chroma_blend, str):
+                    chroma_blend = float(chroma_blend)
+            except (ValueError, TypeError):
+                print(f"Invalid chroma values, using defaults")
+                chroma_similarity = 0.2
+                chroma_blend = 0.15
             
             add_video_overlay_with_chroma(
                 main_video_path=current_video,

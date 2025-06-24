@@ -54,12 +54,38 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         color (str): Alias cho chroma_color (để tương thích ngược)
         similarity (float): Alias cho chroma_similarity (để tương thích ngược)
     """
+    # DEBUG: In ra tất cả parameters nhận được
+    print(f"DEBUG OVERLAY: Received params:")
+    print(f"  chroma_color={chroma_color}")
+    print(f"  chroma_similarity={chroma_similarity}")
+    print(f"  chroma_blend={chroma_blend}")
+    print(f"  color={color}")
+    print(f"  similarity={similarity}")
+    
     # Hỗ trợ tương thích ngược với tham số từ test_chroma_key.py
     if color is not None:
+        print(f"DEBUG OVERLAY: Using color alias: {color}")
         chroma_color = color
     if similarity is not None:
+        print(f"DEBUG OVERLAY: Using similarity alias: {similarity}")
         chroma_similarity = similarity
         chroma_blend = similarity  # Sử dụng cùng giá trị cho blend
+    
+    # Validation tham số
+    try:
+        chroma_similarity = float(chroma_similarity)
+        chroma_blend = float(chroma_blend)
+        
+        # Clamp values to reasonable range
+        chroma_similarity = max(0.0005, min(0.5, chroma_similarity))
+        chroma_blend = max(0.0005, min(0.5, chroma_blend))
+        
+    except (ValueError, TypeError):
+        print(f"Invalid chroma values, using defaults")
+        chroma_similarity = 0.1
+        chroma_blend = 0.1
+    
+    print(f"Final chroma params: color={chroma_color}, similarity={chroma_similarity}, blend={chroma_blend}")
     
     try:
         # Tìm FFmpeg
@@ -92,7 +118,8 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         scale_factor = size_percent / 100.0
         scale_filter = f"[1:v]scale=-1:ih*{scale_factor}[scaled]"
         filter_parts.append(scale_filter)
-          # Áp dụng chroma key nếu cần
+        
+        # Áp dụng chroma key nếu cần
         if chroma_key:
             chromakey_filter = f"[scaled]chromakey={chroma_color}:{chroma_similarity}:{chroma_blend}[keyed]"
             filter_parts.append(chromakey_filter)
@@ -111,7 +138,8 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         filter_parts.append(overlay_filter)
         
         filter_complex = ";".join(filter_parts)
-          # Tạo command FFmpeg
+        
+        # Tạo command FFmpeg
         cmd = [
             ffmpeg_path,
             '-i', main_video_path,
@@ -142,7 +170,7 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         
     except Exception as e:
         raise Exception(f"Không thể chèn video overlay: {str(e)}")
-
+    
 def add_image_overlay(main_video_path, image_path, output_path, 
                      start_time=0, duration=5, position="center", size_percent=20):
     """

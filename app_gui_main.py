@@ -463,7 +463,7 @@ class VideoEditorGUI:
         """Dialog cấu hình video overlay"""
         
         dialog = tk.Toplevel(self.root)
-        dialog.title("🎬 Cấu hình Video Overlay + Chroma Key")
+        dialog.title("Cấu hình Video Overlay + Chroma Key")
         dialog.geometry("550x600")
         dialog.transient(self.root)
         dialog.grab_set()
@@ -478,8 +478,8 @@ class VideoEditorGUI:
         position_var = tk.StringVar(value="top-right")
         size_var = tk.StringVar(value="25")
         chroma_enabled_var = tk.BooleanVar(value=True)
-        chroma_color_var = tk.StringVar(value="no select")
-        sensitivity_var = tk.StringVar(value="no select")
+        chroma_color_var = tk.StringVar(value="green")
+        sensitivity_var = tk.StringVar(value="custom")
 
         # --- Nạp lại cấu hình đã lưu nếu có ---
         if self.video_overlay_settings.get('enabled', False):
@@ -501,11 +501,9 @@ class VideoEditorGUI:
                 chroma_enabled_var.set(prev['chroma_key'])
             if prev.get('chroma_color'):
                 chroma_color_var.set(prev['chroma_color'])
-            if prev.get('chroma_sensitivity'):
-                sensitivity_var.set(prev['chroma_sensitivity'])
 
         # --- Widgets ---
-        ttk.Label(main_frame, text="🎭 Chọn video overlay:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
+        ttk.Label(main_frame, text="Chọn video overlay:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
         video_combo = ttk.Combobox(main_frame, textvariable=video_var, 
                                 values=[os.path.basename(f) for f in video_files], 
                                 state="readonly")
@@ -513,7 +511,7 @@ class VideoEditorGUI:
         if video_var.get() == "" and video_files:
             video_combo.current(0)
 
-        timing_frame = ttk.LabelFrame(main_frame, text="⏰ Thời gian", padding="10")
+        timing_frame = ttk.LabelFrame(main_frame, text="Thời gian", padding="10")
         timing_frame.pack(fill=tk.X, pady=(0, 10))
         timing_grid = ttk.Frame(timing_frame)
         timing_grid.pack(fill=tk.X)
@@ -522,7 +520,7 @@ class VideoEditorGUI:
         ttk.Label(timing_grid, text="Thời lượng (giây):").grid(row=1, column=0, sticky=tk.W, pady=2)
         ttk.Entry(timing_grid, textvariable=duration_var, width=10).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
         
-        layout_frame = ttk.LabelFrame(main_frame, text="📍 Vị trí & Kích thước", padding="10")
+        layout_frame = ttk.LabelFrame(main_frame, text="Vị trí & Kích thước", padding="10")
         layout_frame.pack(fill=tk.X, pady=(0, 10))
         layout_grid = ttk.Frame(layout_frame)
         layout_grid.pack(fill=tk.X)
@@ -533,7 +531,7 @@ class VideoEditorGUI:
         ttk.Label(layout_grid, text="Kích thước (% chiều cao):").grid(row=1, column=0, sticky=tk.W, pady=2)
         ttk.Entry(layout_grid, textvariable=size_var, width=10).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
         
-        chroma_frame = ttk.LabelFrame(main_frame, text="🔥 Chroma Key", padding="10")
+        chroma_frame = ttk.LabelFrame(main_frame, text="Chroma Key", padding="10")
         chroma_frame.pack(fill=tk.X, pady=(0, 10))
         ttk.Checkbutton(chroma_frame, text="Bật chroma key (xóa nền)", variable=chroma_enabled_var).pack(anchor=tk.W)
         chroma_grid = ttk.Frame(chroma_frame)
@@ -544,7 +542,7 @@ class VideoEditorGUI:
                     state="readonly", width=10).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
         ttk.Label(chroma_grid, text="Độ nhạy:").grid(row=1, column=0, sticky=tk.W, pady=2)
         ttk.Combobox(chroma_grid, textvariable=sensitivity_var,
-                    values=["loose", "normal", "strict", "very_strict (Black)", "ultra_strict", "custom (Green)"],
+                    values=["loose", "normal", "custom", "strict", "very_strict", "ultra_strict"],
                     state="readonly", width=12).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
         
         button_frame = ttk.Frame(main_frame)
@@ -556,15 +554,31 @@ class VideoEditorGUI:
                 if not selected_video:
                     messagebox.showerror("Lỗi", "Vui lòng chọn video!")
                     return
+                    
                 # Tìm đường dẫn video gốc từ tên file
                 video_path = None
                 for f in video_files:
                     if os.path.basename(f) == selected_video:
                         video_path = f
                         break
+                        
                 start_time = float(start_var.get())
                 duration = float(duration_var.get()) if duration_var.get().strip() else None
                 size = int(size_var.get())
+                
+                # Lấy color và sensitivity preset
+                chroma_color = chroma_color_var.get()
+                chroma_preset = sensitivity_var.get()
+                
+                # DEBUG: In ra giá trị trước khi convert
+                print(f"DEBUG GUI: chroma_color={chroma_color}, chroma_preset={chroma_preset}")
+                
+                # Convert preset to actual values dựa vào màu
+                similarity, blend = self._get_chroma_values_for_preset(chroma_color, chroma_preset)
+                
+                # DEBUG: In ra giá trị sau khi convert
+                print(f"DEBUG GUI: similarity={similarity}, blend={blend}")
+                
                 self.video_overlay_settings = {
                     'enabled': True,
                     'video_path': video_path,
@@ -573,16 +587,104 @@ class VideoEditorGUI:
                     'position': position_var.get(),
                     'size_percent': size,
                     'chroma_key': chroma_enabled_var.get(),
-                    'chroma_color': chroma_color_var.get(),
-                    'chroma_sensitivity': sensitivity_var.get()
+                    'chroma_color': chroma_color,
+                    'chroma_similarity': similarity,
+                    'chroma_blend': blend
                 }
+                
+                # DEBUG: In ra toàn bộ settings
+                print(f"DEBUG GUI: video_overlay_settings={self.video_overlay_settings}")
+                
+                # Update status message
+                self.video_overlay_status.config(
+                    text=f"Đã cấu hình video overlay: {selected_video} (chroma: {chroma_color}, {similarity:.3f})", 
+                    foreground="green"
+                )
+                
+                self.log_message(f"Saved chroma settings: color={chroma_color}, similarity={similarity}, blend={blend}")
                 dialog.destroy()
+                
             except Exception as e:
                 messagebox.showerror("Lỗi", f"Giá trị không hợp lệ: {e}")
 
-        ttk.Button(button_frame, text="✅ Lưu", command=save_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="❌ Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
-
+        ttk.Button(button_frame, text="Lưu", command=save_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
+    
+    def _get_chroma_values_for_preset(self, color, preset):
+        """Convert color + preset thành similarity, blend values"""
+        
+        # Tham số tối ưu cho từng màu
+        color_settings = {
+            "green": {
+                "loose": (0.3, 0.25),
+                "normal": (0.15, 0.1),
+                "custom": (0.2, 0.15),  # Green optimized
+                "strict": (0.08, 0.05),
+                "very_strict": (0.03, 0.02),
+                "ultra_strict": (0.01, 0.005)
+            },
+            "black": {
+                "loose": (0.05, 0.03),
+                "normal": (0.02, 0.015),
+                "custom": (0.01, 0.005),  # Black precision
+                "strict": (0.005, 0.003),
+                "very_strict": (0.001, 0.001),
+                "ultra_strict": (0.0005, 0.0005)
+            },
+            "blue": {
+                "loose": (0.35, 0.3),
+                "normal": (0.2, 0.15),
+                "custom": (0.25, 0.2),   # Blue optimized
+                "strict": (0.1, 0.08),
+                "very_strict": (0.05, 0.03),
+                "ultra_strict": (0.02, 0.01)
+            },
+            "cyan": {
+                "loose": (0.25, 0.2),
+                "normal": (0.12, 0.08),
+                "custom": (0.15, 0.1),   # Cyan optimized
+                "strict": (0.06, 0.04),
+                "very_strict": (0.03, 0.02),
+                "ultra_strict": (0.01, 0.005)
+            },
+            "red": {
+                "loose": (0.4, 0.35),
+                "normal": (0.25, 0.2),
+                "custom": (0.3, 0.25),   # Red optimized (harder to key)
+                "strict": (0.15, 0.1),
+                "very_strict": (0.08, 0.05),
+                "ultra_strict": (0.03, 0.02)
+            },
+            "magenta": {
+                "loose": (0.3, 0.25),
+                "normal": (0.18, 0.12),
+                "custom": (0.22, 0.18),  # Magenta optimized
+                "strict": (0.1, 0.08),
+                "very_strict": (0.05, 0.03),
+                "ultra_strict": (0.02, 0.01)
+            },
+            "yellow": {
+                "loose": (0.35, 0.3),
+                "normal": (0.22, 0.18),
+                "custom": (0.28, 0.22),  # Yellow optimized (skin tone conflict)
+                "strict": (0.12, 0.1),
+                "very_strict": (0.06, 0.04),
+                "ultra_strict": (0.03, 0.02)
+            }
+        }
+        
+        # Default fallback cho màu khác
+        default_settings = {
+            "loose": (0.3, 0.25),
+            "normal": (0.15, 0.1),
+            "custom": (0.2, 0.15),
+            "strict": (0.05, 0.03),
+            "very_strict": (0.01, 0.005),
+            "ultra_strict": (0.005, 0.003)
+        }
+        
+        color_map = color_settings.get(color.lower(), default_settings)
+        return color_map.get(preset.lower(), (0.2, 0.15))
 
     def create_multiple_overlays(self, selected_video):
         """Tạo cấu hình multiple video overlay giống ảnh 2, 3"""
