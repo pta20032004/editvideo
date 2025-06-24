@@ -463,7 +463,7 @@ class VideoEditorGUI:
         """Dialog cấu hình video overlay"""
         dialog = tk.Toplevel(self.root)
         dialog.title("🎬 Cấu hình Video Overlay + Chroma Key")
-        dialog.geometry("550x450")
+        dialog.geometry("550x600")
         dialog.transient(self.root)
         dialog.grab_set()
         
@@ -529,10 +529,11 @@ class VideoEditorGUI:
                     state="readonly", width=10).grid(row=0, column=1, sticky=tk.W, padx=(10, 0))
         
         ttk.Label(chroma_grid, text="Độ nhạy:").grid(row=1, column=0, sticky=tk.W, pady=2)
-        sensitivity_var = tk.StringVar(value="strict")
+        sensitivity_var = tk.StringVar(value="custom")
         ttk.Combobox(chroma_grid, textvariable=sensitivity_var,
-                    values=["loose", "normal", "strict", "very_strict", "ultra_strict"],
-                    state="readonly", width=10).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+                    values=["loose", "normal", "strict", "very_strict", "ultra_strict", "custom"],
+                    state="readonly", width=12).grid(row=1, column=1, sticky=tk.W, padx=(10, 0))
+
         
         # Thêm nút tạo nhiều overlay
         ttk.Label(chroma_grid, text="").grid(row=2, column=0, pady=5)  # Spacer
@@ -676,68 +677,73 @@ class VideoEditorGUI:
         self.root.update_idletasks()
 
     def start_processing(self):
-        """Bắt đầu xử lý video"""
-        if self.processing:
-            messagebox.showwarning("Cảnh báo", "Đã có quá trình xử lý đang chạy!")
-            return
-        
-        # Kiểm tra đầu vào
-        if not self.input_video_path.get():
-            messagebox.showerror("Lỗi", "Vui lòng chọn file video đầu vào!")
-            return
-        
-        if not self.output_video_path.get():
-            messagebox.showerror("Lỗi", "Vui lòng chọn vị trí lưu video đầu ra!")
-            return
-        
-        # Bắt đầu xử lý trong thread riêng
-        self.processing = True
-        self.progress_bar.start()
-        self.process_button.config(state="disabled")
-        
-        thread = threading.Thread(target=self.process_video_thread)
-        thread.daemon = True
-        thread.start()
-    
-    def process_video_thread(self):
-        """Thread xử lý video"""
+        """Bắt đầu xử lý video với các tuỳ chọn hiện tại"""
         try:
-            self.update_status("Đang xử lý video...")
-            self.log_message("🚀 Bắt đầu xử lý video với overlay...")
-            
-            # Tạo AutoVideoEditor
-            editor = AutoVideoEditor()            
-            # Chuẩn bị tham số
-            img_folder = self.img_folder_path.get() if self.img_folder_path.get() else None
+            # Lấy thông tin từ GUI
+            input_video_path = self.input_video_path.get()
+            output_video_path = self.output_video_path.get()
+            source_language = self.source_language.get()
+            target_language = self.target_language.get()
+            img_folder = self.img_folder_path.get()
+            video_overlay_settings = self.video_overlay_settings
             overlay_times = self.overlay_times if self.overlay_times else None
-            
-            # Xử lý video
-            editor.process_video(
-                input_video_path=self.input_video_path.get(),
-                output_video_path=self.output_video_path.get(),
-                source_language=self.source_language.get(),
-                target_language=self.target_language.get(),
-                img_folder=img_folder,
-                overlay_times=overlay_times,
-                video_overlay_settings=getattr(self, 'video_overlay_settings', None),
-                custom_timeline=False,
-                words_per_line=self.words_per_line.get()
-            )
-            
-            self.update_status("✅ Xử lý hoàn thành!")
-            self.log_message("🎉 Xử lý video thành công!")
-            messagebox.showinfo("Thành công", f"Video đã được lưu tại:\n{self.output_video_path.get()}")
-            
+            words_per_line = self.words_per_line.get()
+
+            # Kiểm tra đầu vào
+            if not input_video_path or not output_video_path:
+                messagebox.showwarning("Thiếu thông tin", "Vui lòng chọn file video đầu vào và vị trí lưu file đầu ra.")
+                return
+
+            # --- BỔ SUNG LOGIC TỰ ĐỘNG ÁP DỤNG CHROMA CUSTOM ---
+            if not video_overlay_settings or not video_overlay_settings.get('enabled', False):
+                # Có thể chỉ định sẵn một video overlay mặc định nếu muốn, hoặc để None
+                self.video_overlay_settings = {
+                    'enabled': True,
+                    'video_path': None,       # Nếu muốn mặc định là None, hoặc chỉ định path overlay video
+                    'start_time': 2,
+                    'duration': 8,
+                    'position': 'top-right',
+                    'size_percent': 25,
+                    'chroma_key': True,
+                    'chroma_color': 'green',
+                    'chroma_sensitivity': 'custom'
+                }
+                video_overlay_settings = self.video_overlay_settings
+            # --- END ---
+
+            self.status_label.config(text="⏳ Đang xử lý... Vui lòng chờ.")
+            self.progress_var.set(0)
+            self.progress_bar.start()
+
+            # Thực hiện xử lý trong thread riêng để không block GUI
+            def worker():
+                try:
+                    self.log_message("🚀 Bắt đầu xử lý video tự động...")
+                    editor = AutoVideoEditor()  # import ở đầu file: from main import AutoVideoEditor
+                    editor.process_video(
+                        input_video_path=input_video_path,
+                        output_video_path=output_video_path,
+                        source_language=source_language,
+                        target_language=target_language,
+                        img_folder=img_folder,
+                        overlay_times=overlay_times,
+                        video_overlay_settings=video_overlay_settings,
+                        words_per_line=words_per_line
+                    )
+                    self.status_label.config(text="✅ Hoàn thành!")
+                    self.log_message("✅ Xử lý xong! File kết quả đã lưu.")
+                except Exception as e:
+                    self.status_label.config(text="❌ Lỗi xử lý!")
+                    self.log_message(f"❌ Lỗi: {e}")
+                finally:
+                    self.progress_bar.stop()
+                    self.progress_var.set(0)
+
+            threading.Thread(target=worker, daemon=True).start()
+
         except Exception as e:
-            error_msg = f"Lỗi xử lý video: {str(e)}"
-            self.update_status("❌ Lỗi xử lý")
-            self.log_message(f"❌ {error_msg}")
-            messagebox.showerror("Lỗi", error_msg)
-        
-        finally:
-            self.processing = False
-            self.progress_bar.stop()
-            self.process_button.config(state="normal")
+            self.status_label.config(text="❌ Lỗi xử lý!")
+            self.log_message(f"❌ Lỗi: {e}")
 
 
 def main():

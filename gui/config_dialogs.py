@@ -274,7 +274,7 @@ class VideoOverlayConfigDialog:
         chroma_combo.grid(row=1, column=1, sticky=tk.W, pady=(5, 0))
         
         ttk.Label(chroma_frame, text="Độ nhạy:").grid(row=2, column=0, sticky=tk.W, padx=(0, 10), pady=(5, 0))
-        self.chroma_sensitivity_var = tk.StringVar(value="normal")
+        self.chroma_sensitivity_var = tk.StringVar(value="custom")
         sens_combo = ttk.Combobox(chroma_frame, textvariable=self.chroma_sensitivity_var,
                                  values=["loose", "normal", "strict", "very_strict"])
         sens_combo.grid(row=2, column=1, sticky=tk.W, pady=(5, 0))

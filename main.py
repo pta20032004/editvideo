@@ -284,6 +284,7 @@ class AutoVideoEditor:
         presets = {
             "loose": (0.3, 0.3),
             "normal": (0.1, 0.1),
+            "custom": (0.2, 0.2),
             "strict": (0.05, 0.05),
             "very_strict": (0.01, 0.01),
             "ultra_strict": (0.005, 0.005)

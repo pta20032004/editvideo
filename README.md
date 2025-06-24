@@ -29,7 +29,7 @@
 python main.py input.mp4 output.mp4
 
 # GUI test (hoạt động tốt)
-python app_gui.main.py
+python app_gui_main.py
 
 # Demo app tổng hợp
 python demo_app.py
