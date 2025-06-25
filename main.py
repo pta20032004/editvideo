@@ -38,22 +38,9 @@ class AutoVideoEditor:
         return colors.get(color_name.lower(), "0x00ff00")    
     
     def process_video(self, input_video_path, output_video_path, source_language='vi', target_language='en', 
-                 video_overlay_settings=None, words_per_line=7):
+             video_overlay_settings=None, words_per_line=7, enable_subtitle=True):
         """
-        Xử lý video chính theo các bước:
-        1. Trích xuất audio
-        2. Tạo phụ đề từ audio
-        3. Dịch phụ đề sang tiếng đích
-        4. Ghép phụ đề và video overlay vào video
-        5. Chuyển đổi tỉ lệ khung hình thành 9:16
-        
-        Args:
-            input_video_path (str): Đường dẫn video input
-            output_video_path (str): Đường dẫn video output
-            source_language (str): Ngôn ngữ gốc
-            target_language (str): Ngôn ngữ đích
-            video_overlay_settings (dict): Cấu hình video overlay với chroma key
-            words_per_line (int): Số từ mỗi dòng phụ đề
+        Xử lý video chính theo các bước - FIXED VIDEO OVERLAY LOGIC
         """
         print("🎬 Bắt đầu xử lý video...")
         
@@ -61,6 +48,7 @@ class AutoVideoEditor:
         print(f"   📹 Input: {input_video_path}")
         print(f"   💾 Output: {output_video_path}")
         print(f"   🌐 Ngôn ngữ: {source_language} → {target_language}")
+        print(f"   📝 Tạo phụ đề: {enable_subtitle}")
         
         if video_overlay_settings and video_overlay_settings.get('enabled', False):
             print(f"   🎬 Video overlay: Có")
@@ -75,38 +63,57 @@ class AutoVideoEditor:
             temp_dir = tempfile.mkdtemp()
             print(f"📁 Thư mục tạm: {temp_dir}")
             
-            # Bước 1: Trích xuất audio từ video
-            print("🎵 Bước 1: Trích xuất audio từ video...")
-            audio_path = os.path.join(temp_dir, "extracted_audio.wav")
-            self.video_processor.extract_audio(input_video_path, audio_path)
+            translated_subtitle_path = None
             
-            # Bước 2: Tạo phụ đề từ audio
-            print("📝 Bước 2: Tạo phụ đề từ audio...")
-            original_subtitle_path = os.path.join(temp_dir, "original_subtitle.srt")
-            self.subtitle_generator.generate_subtitle(
-                audio_path, 
-                original_subtitle_path, 
-                language=source_language,
-                words_per_line=words_per_line
-            )
+            # THÊM ĐIỀU KIỆN CHO PHỤ ĐỀ
+            if enable_subtitle:
+                # Bước 1: Trích xuất audio từ video
+                print("🎵 Bước 1: Trích xuất audio từ video...")
+                audio_path = os.path.join(temp_dir, "extracted_audio.wav")
+                self.video_processor.extract_audio(input_video_path, audio_path)
+                
+                # Bước 2: Tạo phụ đề từ audio
+                print("📝 Bước 2: Tạo phụ đề từ audio...")
+                original_subtitle_path = os.path.join(temp_dir, "original_subtitle.srt")
+                self.subtitle_generator.generate_subtitle(
+                    audio_path, 
+                    original_subtitle_path, 
+                    language=source_language,
+                    words_per_line=words_per_line
+                )
+                
+                # Bước 3: Dịch phụ đề sang ngôn ngữ đích
+                print(f"🌐 Bước 3: Dịch phụ đề từ {source_language} sang {target_language}...")
+                translated_subtitle_path = os.path.join(temp_dir, f"{target_language}_subtitle.srt")
+                self.translator.translate_subtitle(
+                    original_subtitle_path,
+                    translated_subtitle_path,
+                    source_lang=source_language,
+                    target_lang=target_language
+                )
+            else:
+                print("📝 Bỏ qua tạo phụ đề (enable_subtitle=False)")
             
-            # Bước 3: Dịch phụ đề sang ngôn ngữ đích
-            print(f"🌐 Bước 3: Dịch phụ đề từ {source_language} sang {target_language}...")
-            translated_subtitle_path = os.path.join(temp_dir, f"{target_language}_subtitle.srt")
-            self.translator.translate_subtitle(
-                original_subtitle_path,
-                translated_subtitle_path,
-                source_lang=source_language,
-                target_lang=target_language
-            )
+            # Bước 4: Ghép video overlay (và phụ đề nếu có)
+            video_with_effects_path = os.path.join(temp_dir, "video_with_effects.mp4")
             
-            # Bước 4: Ghép phụ đề và video overlay vào video
-            print("🎞️ Bước 4: Ghép phụ đề và video overlay vào video...")
-            video_with_subtitle_path = os.path.join(temp_dir, "video_with_subtitle.mp4")
+            # KIỂM TRA VIDEO OVERLAY CÓ HỢP LẸ KHÔNG
+            should_add_overlay = False
+            overlay_video_path = None
+            
+            if video_overlay_settings and video_overlay_settings.get('enabled', False):
+                # Kiểm tra có video overlay path không
+                overlay_video_path = video_overlay_settings.get('video_path', '')
+                
+                if overlay_video_path and os.path.exists(overlay_video_path):
+                    should_add_overlay = True
+                    print(f"🎬 Video overlay hợp lệ: {overlay_video_path}")
+                else:
+                    print("⚠️ Không có video overlay path hoặc file không tồn tại, bỏ qua video overlay")
             
             # Xử lý video overlay nếu có
-            if video_overlay_settings and video_overlay_settings.get('enabled', False):
-                print("🎬 Đang xử lý video overlay với chroma key...")
+            if should_add_overlay:
+                print("🎞️ Bước 4: Ghép video overlay + phụ đề...")
                 
                 try:
                     temp_video_overlay_path = os.path.join(temp_dir, "temp_with_video_overlay.mp4")
@@ -128,9 +135,9 @@ class AutoVideoEditor:
                         settings = video_overlay_settings
                         
                         # Lấy chroma parameters từ GUI settings
-                        chroma_color = settings.get('chroma_color', 'green')
-                        chroma_similarity = settings.get('chroma_similarity', 0.2)
-                        chroma_blend = settings.get('chroma_blend', 0.15)
+                        chroma_color = settings.get('chroma_color', 'black')
+                        chroma_similarity = settings.get('chroma_similarity', 0.01)
+                        chroma_blend = settings.get('chroma_blend', 0.005)
                         
                         # Convert color name to hex
                         if not str(chroma_color).startswith('0x'):
@@ -144,14 +151,16 @@ class AutoVideoEditor:
                         custom_width = settings.get('custom_width')
                         custom_height = settings.get('custom_height')
                         
+                        print(f"🎨 Chroma key: {chroma_color} (similarity={chroma_similarity}, blend={chroma_blend})")
+                        
                         # Gọi hàm overlay với tất cả parameters
                         add_video_overlay_with_chroma(
                             main_video_path=input_video_path,
-                            overlay_video_path=settings['video_path'],
+                            overlay_video_path=overlay_video_path,  # SỬA: dùng biến đã validate
                             output_path=temp_video_overlay_path,
-                            start_time=settings.get('start_time', 0),
-                            duration=settings.get('duration'),
-                            position=settings.get('position', 'top-right'),
+                            start_time=settings.get('start_time', 2),
+                            duration=settings.get('duration', 10),
+                            position=settings.get('position', 'center'),
                             size_percent=settings.get('size_percent', 25),
                             chroma_key=settings.get('chroma_key', True),
                             chroma_color=chroma_color,
@@ -166,35 +175,52 @@ class AutoVideoEditor:
                             custom_height=custom_height
                         )
                     
-                    # Sau đó thêm phụ đề lên video đã có video overlay
-                    print("📝 Thêm phụ đề...")
-                    self.video_processor.add_subtitle_to_video(
-                        temp_video_overlay_path,
-                        translated_subtitle_path,
-                        video_with_subtitle_path
-                    )
+                    # Sau đó thêm phụ đề lên video đã có video overlay (nếu enable_subtitle)
+                    if enable_subtitle and translated_subtitle_path:
+                        print("📝 Thêm phụ đề lên video overlay...")
+                        self.video_processor.add_subtitle_to_video(
+                            temp_video_overlay_path,
+                            translated_subtitle_path,
+                            video_with_effects_path
+                        )
+                    else:
+                        # Chỉ có video overlay, không có phụ đề
+                        import shutil
+                        shutil.copy2(temp_video_overlay_path, video_with_effects_path)
                     
                 except Exception as e:
-                    print(f"⚠️ Lỗi video overlay: {e}, chỉ ghép phụ đề...")
-                    # Fallback về phương pháp chỉ ghép phụ đề
+                    print(f"⚠️ Lỗi video overlay: {e}")
+                    print("🔄 Fallback: Xử lý không có video overlay...")
+                    # Fallback: xử lý như không có video overlay
+                    if enable_subtitle and translated_subtitle_path:
+                        self.video_processor.add_subtitle_to_video(
+                            input_video_path,
+                            translated_subtitle_path,
+                            video_with_effects_path
+                        )
+                    else:
+                        # Không có gì để thêm, copy nguyên file
+                        import shutil
+                        shutil.copy2(input_video_path, video_with_effects_path)
+            else:
+                # Không có video overlay
+                if enable_subtitle and translated_subtitle_path:
+                    print("🎞️ Bước 4: Chỉ ghép phụ đề (không có video overlay)...")
                     self.video_processor.add_subtitle_to_video(
                         input_video_path,
                         translated_subtitle_path,
-                        video_with_subtitle_path
+                        video_with_effects_path
                     )
-            else:
-                # Chỉ ghép phụ đề (không có video overlay)
-                print("📝 Chỉ ghép phụ đề (không có video overlay)...")
-                self.video_processor.add_subtitle_to_video(
-                    input_video_path,
-                    translated_subtitle_path,
-                    video_with_subtitle_path
-                )
+                else:
+                    # Không có gì để thêm, copy nguyên file
+                    print("🎞️ Bước 4: Không có phụ đề và video overlay, copy nguyên file...")
+                    import shutil
+                    shutil.copy2(input_video_path, video_with_effects_path)
             
             # Bước 5: Chuyển đổi tỉ lệ khung hình thành 9:16
             print("📱 Bước 5: Chuyển đổi tỉ lệ khung hình thành 9:16...")
             self.aspect_converter.convert_to_9_16(
-                video_with_subtitle_path,
+                video_with_effects_path,
                 output_video_path
             )
             
