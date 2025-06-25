@@ -1,6 +1,7 @@
 import os
 import subprocess
 import shutil
+import traceback
 
 class VideoProcessor:
     def __init__(self):
@@ -136,7 +137,7 @@ class VideoProcessor:
         except Exception as e:
             raise Exception(f"Không thể tạo audio trống: {str(e)}")
     
-    def add_subtitle_to_video(self, video_path, subtitle_path, output_path, img_folder="img", overlay_times=None):
+    def add_subtitle_to_video(self, video_path, subtitle_path, output_path, img_folder=None, overlay_times=None):
         """
         Ghép phụ đề, ảnh và video overlay vào video
         
@@ -144,16 +145,23 @@ class VideoProcessor:
             video_path (str): Đường dẫn đến file video
             subtitle_path (str): Đường dẫn đến file phụ đề .srt
             output_path (str): Đường dẫn lưu video có phụ đề và overlay
-            img_folder (str): Thư mục chứa ảnh/video overlay
-            overlay_times (dict): Thông tin thời gian overlay
+            img_folder (str): Thư mục chứa ảnh/video overlay (None = không sử dụng ảnh)
+            overlay_times (dict): Thông tin thời gian overlay (None = không sử dụng)
         """
         try:
-            # Sử dụng hàm mới để xử lý media overlay
-            if overlay_times:
+            # FIX: Kiểm tra rõ ràng img_folder
+            print(f" Kiểm tra cấu hình overlay:")
+            print(f"    img_folder: {img_folder}")
+            print(f"    overlay_times: {'Có' if overlay_times else 'Không'}")
+            
+            # FIX: Chỉ xử lý ảnh khi img_folder được cung cấp và tồn tại
+            if img_folder and os.path.exists(img_folder) and overlay_times:
+                print(f" Sử dụng ảnh overlay từ: {img_folder}")
                 self._add_subtitle_and_media_overlay(video_path, subtitle_path, output_path, img_folder, overlay_times)
             else:
-                # Fallback to old method for backward compatibility
-                self._add_subtitle_and_images_with_filter(video_path, subtitle_path, output_path, img_folder)
+                # FIX: Chỉ ghép phụ đề, không tìm ảnh
+                print(f" Chỉ ghép phụ đề (không có ảnh)")
+                self._add_subtitle_only(video_path, subtitle_path, output_path)
                 
         except Exception as e:
             raise Exception(f"Không thể ghép phụ đề và overlay vào video: {str(e)}")
@@ -311,6 +319,10 @@ class VideoProcessor:
             ]
             
             print(f"🎞️ Đang ghép phụ đề...")
+            print(f"📂 Video: {video_path}")
+            print(f"📝 Subtitle: {subtitle_path}")
+            print(f"💾 Output: {output_path}")
+            
             result = subprocess.run(cmd, capture_output=True, text=True)
             
             if result.returncode != 0:
@@ -321,111 +333,7 @@ class VideoProcessor:
         except Exception as e:
             raise Exception(f"Không thể ghép phụ đề: {str(e)}")
 
-    def _add_subtitle_and_images_with_filter(self, video_path, subtitle_path, output_path, img_folder="img"):
-        """
-        Sử dụng filter để burn-in phụ đề và ghép ảnh cùng lúc vào video
-        """
-        try:
-            # Chuyển đổi đường dẫn Windows cho phụ đề
-            subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
-            
-            # Định nghĩa ảnh và thời gian xuất hiện
-            image_configs = [
-                {"image": "1.png", "start_time": 5, "end_time": 6, "y_offset": 825},
-                {"image": "2.png", "start_time": 6, "end_time": 7, "y_offset": 860},
-                {"image": "3.png", "start_time": 7, "end_time": 8, "y_offset": 860}
-            ]
-            
-            # Kiểm tra ảnh có tồn tại không
-            existing_images = []
-            for config in image_configs:
-                img_path = os.path.join(img_folder, config["image"])
-                if os.path.exists(img_path):
-                    existing_images.append(config)
-                else:
-                    print(f"⚠️ Ảnh không tồn tại: {img_path}, bỏ qua...")
-            
-            # Tạo command FFmpeg
-            inputs = ['-i', video_path]
-            
-            if existing_images:
-                # Có ảnh để ghép
-                for config in existing_images:
-                    img_path = os.path.join(img_folder, config["image"])
-                    img_path = img_path.replace('\\', '/')
-                    inputs.extend(['-i', img_path])
-                
-                # Tạo filter complex: subtitles + overlay images
-                filter_parts = []
-                
-                # Bước 1: Thêm subtitles vào video với font tùy chỉnh
-                font_path = self._get_font_path()
-                if font_path:
-                    subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':fontsdir='{font_path}':force_style='FontName=Plus Jakarta Sans,FontSize=8,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=1,Shadow=1,MarginV=100'[sub]"
-                else:
-                    subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=8,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=1,Shadow=1,MarginV=50'[sub]"
-                filter_parts.append(subtitle_filter)
-                
-                # Bước 2: Thêm từng ảnh với scale 10%
-                current_input = "sub"
-                for i, config in enumerate(existing_images):
-                    img_input = str(i + 1)  # Input index của ảnh
-                    
-                    # Thêm filter scale để thu nhỏ ảnh xuống 10%
-                    scale_filter = f"[{img_input}]scale=iw*0.1:ih*0.1[img{i}]"
-                    filter_parts.append(scale_filter)
-                    
-                    # Tính toán vị trí overlay
-                    x_pos = "(main_w-overlay_w)/2"  # Căn giữa
-                    y_pos = str(config["y_offset"])
-                    
-                    # Overlay với ảnh đã scale
-                    overlay_filter = f"[{current_input}][img{i}]overlay={x_pos}:{y_pos}:enable='between(t,{config['start_time']},{config['end_time']})'"
-                    
-                    if i < len(existing_images) - 1:
-                        # Không phải ảnh cuối cùng
-                        overlay_filter += f"[tmp{i}]"
-                        current_input = f"tmp{i}"
-                    
-                    filter_parts.append(overlay_filter)
-                
-                filter_complex = ";".join(filter_parts)
-                
-                cmd = [
-                    self.ffmpeg_path,
-                    *inputs,
-                    '-filter_complex', filter_complex,
-                    '-c:a', 'copy',
-                    '-y',
-                    output_path
-                ]
-                
-            else:
-                # Không có ảnh, chỉ ghép subtitles
-                cmd = [
-                    self.ffmpeg_path,
-                    '-i', video_path,
-                    '-vf', f"subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=8,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=1,Shadow=1,MarginV=150'",
-                    '-c:a', 'copy',
-                    '-y',
-                    output_path
-                ]
-            
-            print(f"🎞️ Đang ghép phụ đề và ảnh vào video...")
-            if existing_images:
-                for config in existing_images:
-                    print(f"🖼️ Ảnh: {config['image']} ({config['start_time']}s-{config['end_time']}s)")
-            
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            
-            if result.returncode != 0:
-                raise Exception(f"Lỗi ghép phụ đề và ảnh: {result.stderr}")
-            
-            print(f"✅ Ghép phụ đề và ảnh thành công: {output_path}")
-                
-        except Exception as e:
-            raise Exception(f"Không thể ghép phụ đề và ảnh với filter: {str(e)}")
-
+    
     def convert_aspect_ratio(self, input_path, output_path, target_width=1080, target_height=1920):
         """
         Chuyển đổi tỉ lệ khung hình video
@@ -801,17 +709,17 @@ class VideoProcessor:
         
         return None
     
-    def _add_subtitle_and_media_overlay(self, video_path, subtitle_path, output_path, img_folder="img", overlay_times=None):
+    def _add_subtitle_and_media_overlay(self, video_path, subtitle_path, output_path, img_folder, overlay_times):
         """
         Ghép phụ đề, ảnh và video overlay (với chroma key) vào video chính
-        
-        Args:
-            video_path (str): Đường dẫn video gốc
-            subtitle_path (str): Đường dẫn file phụ đề
-            output_path (str): Đường dẫn lưu video kết quả
-            img_folder (str): Thư mục chứa ảnh/video overlay
-            overlay_times (dict): Thông tin thời gian overlay {filename: {'start': float, 'duration': float}}
         """
+        
+        print("🔍 DEBUG: _add_subtitle_and_media_overlay được gọi:")
+        print(f"   📁 img_folder: {img_folder}")
+        print(f"   ⏰ overlay_times: {overlay_times}")
+        print("📋 Call stack:")
+        traceback.print_stack()
+        print("=" * 50)
         try:
             # Chuyển đổi đường dẫn Windows cho phụ đề
             subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
@@ -829,7 +737,7 @@ class VideoProcessor:
                 media_files.extend(glob.glob(os.path.join(img_folder, ext)))
             
             if not media_files:
-                print("⚠️ Không tìm thấy file media nào, chỉ ghép phụ đề...")
+                print("⚠️ Không tìm thấy file media nào trong thư mục, chỉ ghép phụ đề...")
                 return self._add_subtitle_only(video_path, subtitle_path, output_path)
             
             # Chuẩn bị danh sách overlay
@@ -841,21 +749,21 @@ class VideoProcessor:
                 if overlay_times and filename in overlay_times:
                     start_time = overlay_times[filename]['start']
                     duration = overlay_times[filename]['duration']
-                else:
-                    # Giá trị mặc định
-                    start_time = 0
-                    duration = 5
-                
-                # Xác định loại file
-                is_video = any(media_file.lower().endswith(ext) for ext in ['.mp4', '.avi', '.mov', '.mkv', '.wmv'])
-                
-                overlay_configs.append({
-                    'file': media_file,
-                    'filename': filename,
-                    'start_time': start_time,
-                    'duration': duration,
-                    'is_video': is_video
-                })
+                    
+                    # Xác định loại file
+                    is_video = any(media_file.lower().endswith(ext) for ext in ['.mp4', '.avi', '.mov', '.mkv', '.wmv'])
+                    
+                    overlay_configs.append({
+                        'file': media_file,
+                        'filename': filename,
+                        'start_time': start_time,
+                        'duration': duration,
+                        'is_video': is_video
+                    })
+            
+            if not overlay_configs:
+                print("⚠️ Không có file nào trong overlay_times, chỉ ghép phụ đề...")
+                return self._add_subtitle_only(video_path, subtitle_path, output_path)
             
             # Tạo command FFmpeg
             inputs = ['-i', video_path]
