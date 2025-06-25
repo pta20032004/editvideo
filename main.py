@@ -23,8 +23,22 @@ class AutoVideoEditor:
         self.subtitle_generator = SubtitleGenerator()
         self.translator = Translator()
         self.aspect_converter = AspectRatioConverter()
-        
-    def process_video(self, input_video_path, output_video_path, source_language='vi', target_language='en', img_folder=None, overlay_times=None, video_overlay_settings=None, custom_timeline=False, words_per_line=7):
+    def _get_chroma_color(self, color_name):
+        """Chuyển đổi tên màu thành mã hex"""
+        colors = {
+            "green": "0x00ff00",
+            "blue": "0x0000ff", 
+            "cyan": "0x00ffff",
+            "red": "0xff0000",
+            "magenta": "0xff00ff",
+            "yellow": "0xffff00",
+            "black": "0x000000",
+            "white": "0xffffff",
+        }
+        return colors.get(color_name.lower(), "0x00ff00")    
+    
+    def process_video(self, input_video_path, output_video_path, source_language='vi', target_language='en', 
+                 img_folder=None, overlay_times=None, video_overlay_settings=None, custom_timeline=False, words_per_line=7):
         """
         Xử lý video chính theo các bước:
         1. Trích xuất audio
@@ -34,9 +48,46 @@ class AutoVideoEditor:
         5. Chuyển đổi tỉ lệ khung hình thành 9:16
         
         Args:
-            custom_timeline (bool): Sử dụng timeline tùy chỉnh cho 3 ảnh (1.png, 2.png, 3.png)
+            input_video_path (str): Đường dẫn video input
+            output_video_path (str): Đường dẫn video output
+            source_language (str): Ngôn ngữ gốc
+            target_language (str): Ngôn ngữ đích
+            img_folder (str): Thư mục chứa ảnh overlay (có thể None)
+            overlay_times (dict): Thông tin thời gian overlay ảnh
+            video_overlay_settings (dict): Cấu hình video overlay với chroma key
+            custom_timeline (bool): Sử dụng timeline tùy chỉnh cho 3 ảnh
+            words_per_line (int): Số từ mỗi dòng phụ đề
         """
         print("🎬 Bắt đầu xử lý video...")
+        
+        # FIX: Log cấu hình rõ ràng
+        print("🎯 Cấu hình xử lý:")
+        print(f"   📹 Input: {input_video_path}")
+        print(f"   💾 Output: {output_video_path}")
+        print(f"   🌐 Ngôn ngữ: {source_language} → {target_language}")
+        
+        if img_folder:
+            print(f"   🖼️ Thư mục ảnh: {img_folder}")
+            if os.path.exists(img_folder):
+                print(f"   ✅ Thư mục ảnh tồn tại")
+                if overlay_times:
+                    print(f"   ⏰ Có {len(overlay_times)} cấu hình overlay ảnh")
+                else:
+                    print(f"   ⏰ Không có cấu hình overlay times")
+            else:
+                print(f"   ❌ Thư mục ảnh không tồn tại, bỏ qua ảnh overlay")
+                img_folder = None
+        else:
+            print(f"   🖼️ Không sử dụng ảnh overlay")
+        
+        if video_overlay_settings and video_overlay_settings.get('enabled', False):
+            print(f"   🎬 Video overlay: Có")
+        else:
+            print(f"   🎬 Video overlay: Không")
+        
+        print(f"   📝 Custom timeline: {custom_timeline}")
+        print(f"   📄 Words per line: {words_per_line}")
+        print("=" * 50)
         
         try:
             # Tạo thư mục tạm
@@ -94,7 +145,7 @@ class AutoVideoEditor:
                             temp_dir
                         )
                     else:
-                        # Xử lý single overlay (từ GUI)
+                        # Xử lý single overlay (từ GUI) với parameters mới
                         from video_overlay import add_video_overlay_with_chroma
                         settings = video_overlay_settings
                         
@@ -113,6 +164,18 @@ class AutoVideoEditor:
                         if not str(chroma_color).startswith('0x'):
                             chroma_color = self._get_chroma_color(chroma_color)
                         
+                        # NEW: Extract position and size parameters
+                        position_mode = settings.get('position_mode', 'preset')
+                        custom_x = settings.get('custom_x')
+                        custom_y = settings.get('custom_y')
+                        size_mode = settings.get('size_mode', 'percentage')
+                        custom_width = settings.get('custom_width')
+                        custom_height = settings.get('custom_height')
+                        
+                        print(f"DEBUG MAIN: Position mode={position_mode}, custom_x={custom_x}, custom_y={custom_y}")
+                        print(f"DEBUG MAIN: Size mode={size_mode}, custom_width={custom_width}, custom_height={custom_height}")
+                        
+                        # Gọi hàm overlay với tất cả parameters
                         add_video_overlay_with_chroma(
                             main_video_path=input_video_path,
                             overlay_video_path=settings['video_path'],
@@ -124,11 +187,20 @@ class AutoVideoEditor:
                             chroma_key=settings.get('chroma_key', True),
                             chroma_color=chroma_color,
                             chroma_similarity=chroma_similarity,
-                            chroma_blend=chroma_blend
+                            chroma_blend=chroma_blend,
+                            auto_hide=settings.get('auto_hide', True),
+                            # NEW: Pass custom position and size parameters
+                            position_mode=position_mode,
+                            custom_x=custom_x,
+                            custom_y=custom_y,
+                            size_mode=size_mode,
+                            custom_width=custom_width,
+                            custom_height=custom_height
                         )
                     
                     # Sau đó thêm phụ đề và image overlay lên video đã có video overlay
                     if img_folder and overlay_times and os.path.exists(img_folder):
+                        print("🖼️ Thêm image overlay và phụ đề...")
                         self.video_processor.add_subtitle_to_video(
                             temp_video_overlay_path,
                             translated_subtitle_path,
@@ -138,6 +210,7 @@ class AutoVideoEditor:
                         )
                     else:
                         # Chỉ thêm phụ đề
+                        print("📝 Chỉ thêm phụ đề...")
                         self.video_processor.add_subtitle_to_video(
                             temp_video_overlay_path,
                             translated_subtitle_path,
@@ -146,7 +219,7 @@ class AutoVideoEditor:
                     
                 except Exception as e:
                     print(f"⚠️ Lỗi video overlay: {e}, sử dụng phương pháp cũ...")
-                    # Fallback về phương pháp cũ
+                    # Fallback về phương pháp cũ nếu có lỗi
                     if img_folder and overlay_times and os.path.exists(img_folder):
                         self.video_processor.add_subtitle_to_video(
                             input_video_path,
@@ -163,7 +236,9 @@ class AutoVideoEditor:
                         )
             
             # Xử lý image overlay và phụ đề (nếu không có video overlay)
-            elif img_folder and os.path.exists(img_folder):
+            elif img_folder and os.path.exists(img_folder):  # FIX: Kiểm tra cả img_folder và exists
+                print(f"🖼️ Xử lý ảnh overlay từ thư mục: {img_folder}")
+                
                 # Kiểm tra nếu sử dụng custom timeline
                 if custom_timeline:
                     print("🎯 Sử dụng custom timeline cho 3 ảnh...")
@@ -220,13 +295,15 @@ class AutoVideoEditor:
                         )
                 else:
                     # Chỉ ghép phụ đề với thư mục ảnh (không có overlay times)
+                    print("📝 Ghép phụ đề với thư mục ảnh (không có cấu hình overlay times)...")
                     self.video_processor.add_subtitle_to_video(
                         input_video_path,
                         translated_subtitle_path,
                         video_with_subtitle_path
                     )
             else:
-                # Chỉ ghép phụ đề
+                # FIX: Chỉ ghép phụ đề (không có ảnh overlay)
+                print("📝 Chỉ ghép phụ đề (không có ảnh overlay)...")
                 self.video_processor.add_subtitle_to_video(
                     input_video_path,
                     translated_subtitle_path,
@@ -249,84 +326,105 @@ class AutoVideoEditor:
             
         except Exception as e:
             print(f"❌ Lỗi trong quá trình xử lý: {str(e)}")
+            import traceback
+            print(f"Chi tiết lỗi: {traceback.format_exc()}")
             raise
-    def _process_multiple_video_overlays(self, input_video_path, output_path, settings_list, temp_dir):
-        """Xử lý nhiều video overlay"""
-        current_video = input_video_path
-        
-        for i, settings in enumerate(settings_list):
-            temp_output = os.path.join(temp_dir, f"temp_overlay_{i}.mp4")
-            
-            print(f"Áp dụng video overlay {i+1}/{len(settings_list)}...")
-            
-            from video_overlay import add_video_overlay_with_chroma
-            
-            # Xử lý chroma parameters từ GUI
-            chroma_color = settings.get('chroma_color', 'green')
-            chroma_similarity = settings.get('chroma_similarity', 0.2)
-            chroma_blend = settings.get('chroma_blend', 0.15)
-            
-            print(f"Processing chroma: color={chroma_color}, similarity={chroma_similarity}, blend={chroma_blend}")
-            
-            # Convert color name to hex nếu cần
-            if not str(chroma_color).startswith('0x'):
-                chroma_color = self._get_chroma_color(chroma_color)
-            
-            # Đảm bảo similarity và blend là số
-            try:
-                if isinstance(chroma_similarity, str):
-                    chroma_similarity = float(chroma_similarity)
-                if isinstance(chroma_blend, str):
-                    chroma_blend = float(chroma_blend)
-            except (ValueError, TypeError):
-                print(f"Invalid chroma values, using defaults")
-                chroma_similarity = 0.2
-                chroma_blend = 0.15
-            
-            add_video_overlay_with_chroma(
-                main_video_path=current_video,
-                overlay_video_path=settings['video_path'],
-                output_path=temp_output,
-                start_time=settings.get('start_time', 0),
-                duration=settings.get('duration'),
-                position=settings.get('position', 'top-right'),
-                size_percent=settings.get('size_percent', 25),
-                chroma_key=settings.get('chroma_key', True),
-                color=chroma_color,  # Sử dụng alias từ test_chroma_key.py
-                similarity=chroma_similarity  # Sử dụng alias từ test_chroma_key.py
-            )
-            
-            current_video = temp_output
-        
-        # Copy kết quả cuối cùng
-        import shutil
-        shutil.copy2(current_video, output_path)
-        return True
 
-    def _get_chroma_color(self, color_name):
-        """Chuyển đổi tên màu thành mã hex"""
-        colors = {
-            "green": "0x00ff00",
-            "blue": "0x0000ff", 
-            "cyan": "0x00ffff",
-            "red": "0xff0000",
-            "magenta": "0xff00ff",
-            "yellow": "0xffff00",
-            "black": "0x000000",
-        }
-        return colors.get(color_name.lower(), "0x00ff00")
+def _process_multiple_video_overlays(self, input_video_path, output_path, settings_list, temp_dir):
+    """Xử lý nhiều video overlay với custom position và size"""
+    current_video = input_video_path
     
-    def _get_chroma_sensitivity(self, preset_name):
-        """Chuyển đổi preset độ nhạy thành giá trị"""
-        presets = {
-            "loose": (0.3, 0.3),
-            "normal": (0.1, 0.1),
-            "custom": (0.2, 0.2), #Green
-            "strict": (0.05, 0.05),
-            "very_strict": (0.01, 0.01), #Black
-            "ultra_strict": (0.005, 0.005)
-        }
-        return presets.get(preset_name.lower(), (0.01, 0.01))
+    for i, settings in enumerate(settings_list):
+        temp_output = os.path.join(temp_dir, f"temp_overlay_{i}.mp4")
+        
+        print(f"🎬 Áp dụng video overlay {i+1}/{len(settings_list)}...")
+        
+        from video_overlay import add_video_overlay_with_chroma
+        
+        # Xử lý chroma parameters từ GUI
+        chroma_color = settings.get('chroma_color', 'green')
+        chroma_similarity = settings.get('chroma_similarity', 0.2)
+        chroma_blend = settings.get('chroma_blend', 0.15)
+        
+        print(f"Processing chroma: color={chroma_color}, similarity={chroma_similarity}, blend={chroma_blend}")
+        
+        # Convert color name to hex nếu cần
+        if not str(chroma_color).startswith('0x'):
+            chroma_color = self._get_chroma_color(chroma_color)
+        
+        # Đảm bảo similarity và blend là số
+        try:
+            if isinstance(chroma_similarity, str):
+                chroma_similarity = float(chroma_similarity)
+            if isinstance(chroma_blend, str):
+                chroma_blend = float(chroma_blend)
+        except (ValueError, TypeError):
+            print(f"Invalid chroma values, using defaults")
+            chroma_similarity = 0.2
+            chroma_blend = 0.15
+        
+        # NEW: Extract position and size parameters cho multiple overlays
+        position_mode = settings.get('position_mode', 'preset')
+        custom_x = settings.get('custom_x')
+        custom_y = settings.get('custom_y')
+        size_mode = settings.get('size_mode', 'percentage')
+        custom_width = settings.get('custom_width')
+        custom_height = settings.get('custom_height')
+        
+        add_video_overlay_with_chroma(
+            main_video_path=current_video,
+            overlay_video_path=settings['video_path'],
+            output_path=temp_output,
+            start_time=settings.get('start_time', 0),
+            duration=settings.get('duration'),
+            position=settings.get('position', 'top-right'),
+            size_percent=settings.get('size_percent', 25),
+            chroma_key=settings.get('chroma_key', True),
+            color=chroma_color,  # Sử dụng alias từ test_chroma_key.py
+            similarity=chroma_similarity,  # Sử dụng alias từ test_chroma_key.py
+            auto_hide=settings.get('auto_hide', True),
+            # NEW: Pass custom parameters for multiple overlays
+            position_mode=position_mode,
+            custom_x=custom_x,
+            custom_y=custom_y,
+            size_mode=size_mode,
+            custom_width=custom_width,
+            custom_height=custom_height
+        )
+        
+        current_video = temp_output
+    
+    # Copy kết quả cuối cùng
+    import shutil
+    shutil.copy2(current_video, output_path)
+    return True
+
+def _get_chroma_color(self, color_name):
+    """Chuyển đổi tên màu thành mã hex"""
+    colors = {
+        "green": "0x00ff00",
+        "blue": "0x0000ff", 
+        "cyan": "0x00ffff",
+        "red": "0xff0000",
+        "magenta": "0xff00ff",
+        "yellow": "0xffff00",
+        "black": "0x000000",
+        "white": "0xffffff",
+    }
+    return colors.get(color_name.lower(), "0x00ff00")
+
+def _get_chroma_sensitivity(self, preset_name):
+    """Chuyển đổi preset độ nhạy thành giá trị"""
+    presets = {
+        "loose": (0.3, 0.3),
+        "normal": (0.1, 0.1),
+        "custom": (0.2, 0.2), #Green
+        "strict": (0.05, 0.05),
+        "very_strict": (0.01, 0.01), #Black
+        "ultra_strict": (0.005, 0.005)
+    }
+    return presets.get(preset_name.lower(), (0.01, 0.01))
+
 
 def main():
     parser = argparse.ArgumentParser(

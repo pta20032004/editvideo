@@ -8,6 +8,8 @@ import os
 import subprocess
 import glob
 
+
+
 # Màu chroma key phổ biến
 CHROMA_COLORS = {
     "green": "0x00ff00",      # Xanh lá cây (phổ biến nhất)
@@ -134,9 +136,12 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
                                  start_time=0, duration=None, position="center", 
                                  size_percent=30, chroma_key=True, chroma_color="0x00ff00",
                                  chroma_similarity=0.1, chroma_blend=0.1, 
-                                 color=None, similarity=None, auto_hide=True):
+                                 color=None, similarity=None, auto_hide=True,
+                                 # NEW: Custom position and size parameters
+                                 position_mode="preset", custom_x=None, custom_y=None,
+                                 size_mode="percentage", custom_width=None, custom_height=None):
     """
-    Chèn video overlay vào video chính với tùy chọn chroma key nâng cao
+    Chèn video overlay vào video chính với tùy chọn chroma key và vị trí/kích thước tùy chỉnh
     
     Args:
         main_video_path (str): Đường dẫn video chính
@@ -144,104 +149,105 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         output_path (str): Đường dẫn lưu kết quả
         start_time (float): Thời gian bắt đầu (giây)
         duration (float): Thời lượng hiển thị tối đa (None = toàn bộ video)
-        position (str): Vị trí ('center', 'top-left', 'top-right', 'bottom-left', 'bottom-right')
+        position (str): Vị trí preset ('center', 'top-left', 'top-right', 'bottom-left', 'bottom-right')
         size_percent (int): Kích thước theo % chiều cao video chính
         chroma_key (bool): Có áp dụng chroma key không
-        chroma_color (str): Màu chroma key (hex format, vd: "0x00ff00" cho xanh lá)
-        chroma_similarity (float): Độ tương tự màu (0.01-0.5, càng nhỏ càng nghiêm ngặt)
-        chroma_blend (float): Độ mờ biên (0.01-0.5, càng nhỏ càng sắc nét)
-        color (str): Alias cho chroma_color (để tương thích ngược)
-        similarity (float): Alias cho chroma_similarity (để tương thích ngược)
+        chroma_color (str): Màu chroma key (hex format)
+        chroma_similarity (float): Độ tương tự màu (0.01-0.5)
+        chroma_blend (float): Độ mờ biên (0.01-0.5)
         auto_hide (bool): Tự động ẩn khi video overlay kết thúc
+        
+        # NEW: Custom positioning
+        position_mode (str): "preset" hoặc "custom"
+        custom_x (int): Tọa độ X tùy chỉnh (nếu position_mode="custom")
+        custom_y (int): Tọa độ Y tùy chỉnh (nếu position_mode="custom")
+        
+        # NEW: Custom sizing
+        size_mode (str): "percentage" hoặc "custom"
+        custom_width (int): Chiều rộng tùy chỉnh (nếu size_mode="custom")
+        custom_height (int): Chiều cao tùy chỉnh (nếu size_mode="custom")
     """
-    # DEBUG: In ra tất cả parameters nhận được
-    print(f"DEBUG OVERLAY: Received params:")
-    print(f"  chroma_color={chroma_color}")
-    print(f"  chroma_similarity={chroma_similarity}")
-    print(f"  chroma_blend={chroma_blend}")
-    print(f"  color={color}")
-    print(f"  similarity={similarity}")
-    print(f"  auto_hide={auto_hide}")
     
-    # Hỗ trợ tương thích ngược với tham số từ test_chroma_key.py
+    # Support for backward compatibility aliases
     if color is not None:
-        print(f"DEBUG OVERLAY: Using color alias: {color}")
         chroma_color = color
     if similarity is not None:
-        print(f"DEBUG OVERLAY: Using similarity alias: {similarity}")
         chroma_similarity = similarity
-        chroma_blend = similarity  # Sử dụng cùng giá trị cho blend
-    
-    # Validation tham số
+        chroma_blend = similarity
+
+    # Validation
     try:
         chroma_similarity = float(chroma_similarity)
         chroma_blend = float(chroma_blend)
-        
-        # Clamp values to reasonable range
         chroma_similarity = max(0.0005, min(0.5, chroma_similarity))
         chroma_blend = max(0.0005, min(0.5, chroma_blend))
-        
     except (ValueError, TypeError):
         print(f"Invalid chroma values, using defaults")
         chroma_similarity = 0.1
         chroma_blend = 0.1
-    
-    print(f"Final chroma params: color={chroma_color}, similarity={chroma_similarity}, blend={chroma_blend}")
-    
+
     try:
-        # Tìm FFmpeg
         ffmpeg_path = find_ffmpeg()
         
-        # Calculate actual overlay duration if auto_hide is enabled
+        # Calculate overlay duration with auto_hide
         if auto_hide:
             overlay_duration = get_video_duration(overlay_video_path)
             if overlay_duration:
                 if duration:
-                    # Use the shorter of: user-specified duration or actual video duration
                     actual_duration = min(duration, overlay_duration)
                 else:
-                    # Use actual video duration
                     actual_duration = overlay_duration
-                
                 print(f"Auto-hide enabled: overlay duration={overlay_duration:.2f}s, using duration={actual_duration:.2f}s")
             else:
-                # Fallback to user duration if can't get video duration
                 actual_duration = duration
                 print(f"Could not get overlay duration, using user duration={duration}")
         else:
-            # Use user-specified duration (original behavior)
             actual_duration = duration
             print(f"Auto-hide disabled, using user duration={duration}")
         
-        # Tính toán vị trí
-        if position == "center":
-            x_pos = "(main_w-overlay_w)/2"
-            y_pos = "(main_h-overlay_h)/2"
-        elif position == "top-left":
-            x_pos = "10"
-            y_pos = "10"
-        elif position == "top-right":
-            x_pos = "main_w-overlay_w-10"
-            y_pos = "10"
-        elif position == "bottom-left":
-            x_pos = "10"
-            y_pos = "main_h-overlay_h-10"
-        elif position == "bottom-right":
-            x_pos = "main_w-overlay_w-10"
-            y_pos = "main_h-overlay_h-10"
+        # Determine position based on mode
+        if position_mode == "custom" and custom_x is not None and custom_y is not None:
+            x_pos = str(custom_x)
+            y_pos = str(custom_y)
+            print(f"📍 Using custom position: X={custom_x}, Y={custom_y}")
         else:
-            x_pos = "(main_w-overlay_w)/2"
-            y_pos = "(main_h-overlay_h)/2"
+            # Use preset positions
+            if position == "center":
+                x_pos = "(main_w-overlay_w)/2"
+                y_pos = "(main_h-overlay_h)/2"
+            elif position == "top-left":
+                x_pos = "10"
+                y_pos = "10"
+            elif position == "top-right":
+                x_pos = "main_w-overlay_w-10"
+                y_pos = "10"
+            elif position == "bottom-left":
+                x_pos = "10"
+                y_pos = "main_h-overlay_h-10"
+            elif position == "bottom-right":
+                x_pos = "main_w-overlay_w-10"
+                y_pos = "main_h-overlay_h-10"
+            else:
+                x_pos = "(main_w-overlay_w)/2"
+                y_pos = "(main_h-overlay_h)/2"
+            print(f"📍 Using preset position: {position}")
         
-        # Tạo filter complex
+        # Create filter complex
         filter_parts = []
         
-        # Scale video overlay
-        scale_factor = size_percent / 100.0
-        scale_filter = f"[1:v]scale=-1:ih*{scale_factor}[scaled]"
+        # Determine scaling method based on size mode
+        if size_mode == "custom" and custom_width is not None and custom_height is not None:
+            scale_filter = f"[1:v]scale={custom_width}:{custom_height}[scaled]"
+            print(f"📏 Using custom size: W={custom_width}, H={custom_height}")
+        else:
+            # Use percentage scaling
+            scale_factor = size_percent / 100.0
+            scale_filter = f"[1:v]scale=-1:ih*{scale_factor}[scaled]"
+            print(f"📏 Using percentage size: {size_percent}%")
+        
         filter_parts.append(scale_filter)
         
-        # Áp dụng chroma key nếu cần
+        # Apply chroma key if needed
         if chroma_key:
             chromakey_filter = f"[scaled]chromakey={chroma_color}:{chroma_similarity}:{chroma_blend}[keyed]"
             filter_parts.append(chromakey_filter)
@@ -249,7 +255,7 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         else:
             overlay_input = "scaled"
         
-        # Tạo overlay với thời gian (NEW: use actual_duration)
+        # Create overlay with timing
         if actual_duration:
             end_time = start_time + actual_duration
             time_condition = f"enable='between(t,{start_time},{end_time})'"
@@ -261,7 +267,7 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         
         filter_complex = ";".join(filter_parts)
         
-        # Tạo command FFmpeg
+        # Create FFmpeg command
         cmd = [
             ffmpeg_path,
             '-i', main_video_path,
@@ -279,8 +285,17 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
             print(f"⏰ Thời gian: {start_time}s - {start_time + actual_duration:.2f}s (auto-hide)")
         else:
             print(f"⏰ Thời gian: {start_time}s - {start_time + (actual_duration or 0):.2f}s")
-        print(f"📍 Vị trí: {position}")
-        print(f"📏 Kích thước: {size_percent}%")
+        
+        if position_mode == "custom":
+            print(f"📍 Vị trí tùy chỉnh: X={custom_x}, Y={custom_y}")
+        else:
+            print(f"📍 Vị trí preset: {position}")
+            
+        if size_mode == "custom":
+            print(f"📏 Kích thước tùy chỉnh: {custom_width}x{custom_height}")
+        else:
+            print(f"📏 Kích thước: {size_percent}%")
+            
         print(f"🔥 Chroma key: {'Có' if chroma_key else 'Không'}")
         if chroma_key:
             print(f"🎨 Màu chroma: {chroma_color}")

@@ -41,13 +41,17 @@ class VideoEditorGUI:
         self.output_video_path = tk.StringVar()
         self.source_language = tk.StringVar(value="vi")
         self.target_language = tk.StringVar(value="en")
-        self.img_folder_path = tk.StringVar(value="img")
-        self.video_folder_path = tk.StringVar(value="videoinput")
-        self.words_per_line = tk.IntVar(value=7)  # Số từ mỗi dòng phụ đề
+        
+        # FIX: Đặt giá trị mặc định là rỗng thay vì "img"
+        self.img_folder_path = tk.StringVar(value="")  # Thay đổi từ "img" thành ""
+        self.video_folder_path = tk.StringVar(value="")  # Thay đổi từ "videoinput" thành ""
+        
+        self.words_per_line = tk.IntVar(value=7)
         self.processing = False
-          # Overlay settings
+        
+        # Overlay settings
         self.overlay_times = {}
-        self.animation_config = {}  # Cấu hình animation cho ảnh
+        self.animation_config = {}
         self.video_overlay_settings = {'enabled': False}
         
         self.setup_ui()
@@ -237,12 +241,25 @@ class VideoEditorGUI:
     def select_img_folder(self):
         """Chọn thư mục chứa ảnh overlay"""
         folder_path = filedialog.askdirectory(
-            title="Chọn thư mục chứa ảnh overlay",
-            initialdir=self.img_folder_path.get() if self.img_folder_path.get() else "."
+            title="Chọn thư mục chứa ảnh overlay"
         )
         if folder_path:
             self.img_folder_path.set(folder_path)
-            self.log_message(f"📁 Đã chọn thư mục ảnh: {folder_path}")
+            self.log_message(f" Đã chọn thư mục ảnh: {folder_path}")
+            
+            # Kiểm tra và hiển thị file ảnh
+            image_files = []
+            for ext in ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.bmp']:
+                image_files.extend(glob.glob(os.path.join(folder_path, ext)))
+            
+            if image_files:
+                self.log_message(f"🖼️ Tìm thấy {len(image_files)} ảnh: {[os.path.basename(f) for f in image_files]}")
+            else:
+                self.log_message("⚠️ Không tìm thấy ảnh nào trong thư mục")
+        else:
+            # FIX: Nếu user cancel dialog, clear folder path
+            self.img_folder_path.set("")
+            self.log_message("❌ Đã hủy chọn thư mục ảnh")
     
     def select_video_folder(self):
         """Chọn thư mục chứa video overlay"""
@@ -260,9 +277,9 @@ class VideoEditorGUI:
                 video_files.extend(glob.glob(os.path.join(folder_path, ext)))
             
             if video_files:
-                self.log_message(f"🎬 Tìm thấy {len(video_files)} file video: {[os.path.basename(f) for f in video_files]}")
+                self.log_message(f" Tìm thấy {len(video_files)} file video: {[os.path.basename(f) for f in video_files]}")
             else:
-                self.log_message("⚠️ Không tìm thấy file video nào trong thư mục")
+                self.log_message(" Không tìm thấy file video nào trong thư mục")
 
     def configure_overlay_timing(self):
         """Cấu hình thời gian overlay ảnh"""
@@ -285,7 +302,7 @@ class VideoEditorGUI:
     def show_overlay_timing_dialog(self, img_files):
         """Dialog cấu hình thời gian overlay ảnh với animation"""
         dialog = tk.Toplevel(self.root)
-        dialog.title("⏰✨ Cấu hình Overlay Ảnh + Animation")
+        dialog.title(" Cấu hình Overlay Ảnh + Animation")
         dialog.geometry("700x500")
         dialog.transient(self.root)
         dialog.grab_set()
@@ -470,11 +487,11 @@ class VideoEditorGUI:
         self.show_video_overlay_dialog(video_files)
     
     def show_video_overlay_dialog(self, video_files):
-        """Dialog cấu hình video overlay"""
+        """Dialog cấu hình video overlay với giao diện động"""
         
         dialog = tk.Toplevel(self.root)
-        dialog.title("Cấu hình Video Overlay + Chroma Key")
-        dialog.geometry("500x600")
+        dialog.title("🎬 Cấu hình Video Overlay + Chroma Key")
+        dialog.geometry("600x800")
         dialog.transient(self.root)
         dialog.grab_set()
         
@@ -485,18 +502,30 @@ class VideoEditorGUI:
         video_var = tk.StringVar()
         start_var = tk.StringVar(value="2")
         duration_var = tk.StringVar(value="10")
-        position_var = tk.StringVar(value="top-right")
-        size_var = tk.StringVar(value="25")
+        
+        # Position settings
+        position_mode_var = tk.StringVar(value="preset")
+        position_preset_var = tk.StringVar(value="top-right")
+        custom_x_var = tk.StringVar(value="300")
+        custom_y_var = tk.StringVar(value="1600")
+        
+        # Size settings  
+        size_mode_var = tk.StringVar(value="percentage")
+        size_percent_var = tk.StringVar(value="25")
+        custom_width_var = tk.StringVar(value="500")
+        custom_height_var = tk.StringVar(value="600")
+        
+        # Chroma settings
         chroma_enabled_var = tk.BooleanVar(value=True)
         chroma_color_var = tk.StringVar(value="green")
         advanced_mode_var = tk.BooleanVar(value=False)
-        auto_hide_var = tk.BooleanVar(value=True)  # NEW: Default to auto hide
+        auto_hide_var = tk.BooleanVar(value=True)
         
-        # Advanced controls (hidden by default)
-        custom_similarity_var = tk.DoubleVar(value=0.2)
-        custom_blend_var = tk.DoubleVar(value=0.15)
+        # Advanced controls - sử dụng StringVar thay vì DoubleVar để user nhập trực tiếp
+        custom_similarity_var = tk.StringVar(value="0.200")
+        custom_blend_var = tk.StringVar(value="0.150")
 
-        # --- Nạp lại cấu hình đã lưu nếu có ---
+        # --- Load saved settings ---
         if self.video_overlay_settings.get('enabled', False):
             prev = self.video_overlay_settings
             if prev.get('video_path'):
@@ -508,10 +537,24 @@ class VideoEditorGUI:
                 start_var.set(str(prev['start_time']))
             if prev.get('duration') is not None:
                 duration_var.set(str(prev['duration']))
+            
+            # Load settings
+            if prev.get('position_mode'):
+                position_mode_var.set(prev['position_mode'])
             if prev.get('position'):
-                position_var.set(prev['position'])
+                position_preset_var.set(prev['position'])
+            if prev.get('custom_x') is not None:
+                custom_x_var.set(str(prev['custom_x']))
+            if prev.get('custom_y') is not None:
+                custom_y_var.set(str(prev['custom_y']))
+            if prev.get('size_mode'):
+                size_mode_var.set(prev['size_mode'])
             if prev.get('size_percent') is not None:
-                size_var.set(str(prev['size_percent']))
+                size_percent_var.set(str(prev['size_percent']))
+            if prev.get('custom_width') is not None:
+                custom_width_var.set(str(prev['custom_width']))
+            if prev.get('custom_height') is not None:
+                custom_height_var.set(str(prev['custom_height']))
             if prev.get('chroma_key') is not None:
                 chroma_enabled_var.set(prev['chroma_key'])
             if prev.get('chroma_color'):
@@ -519,7 +562,7 @@ class VideoEditorGUI:
             if prev.get('auto_hide') is not None:
                 auto_hide_var.set(prev['auto_hide'])
 
-        # --- Widgets ---
+        # --- Video selection ---
         ttk.Label(main_frame, text="Chọn video overlay:", font=("Arial", 10, "bold")).pack(anchor=tk.W, pady=(0, 5))
         video_combo = ttk.Combobox(main_frame, textvariable=video_var, 
                                 values=[os.path.basename(f) for f in video_files], 
@@ -528,57 +571,124 @@ class VideoEditorGUI:
         if video_var.get() == "" and video_files:
             video_combo.current(0)
 
-        # FIXED: Use consistent pack layout for timing section
-        timing_frame = ttk.LabelFrame(main_frame, text="Thời gian", padding="10")
+        # --- Timing section ---
+        timing_frame = ttk.LabelFrame(main_frame, text="⏰ Thời gian", padding="10")
         timing_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Start time
         start_frame = ttk.Frame(timing_frame)
         start_frame.pack(fill=tk.X, pady=2)
         ttk.Label(start_frame, text="Bắt đầu (giây):").pack(side=tk.LEFT)
         ttk.Entry(start_frame, textvariable=start_var, width=10).pack(side=tk.LEFT, padx=(10, 0))
         
-        # Duration
         duration_frame = ttk.Frame(timing_frame)
         duration_frame.pack(fill=tk.X, pady=2)
         ttk.Label(duration_frame, text="Thời lượng tối đa (giây):").pack(side=tk.LEFT)
         ttk.Entry(duration_frame, textvariable=duration_var, width=10).pack(side=tk.LEFT, padx=(10, 0))
         
-        # FIXED: Auto hide option using pack
         auto_hide_frame = ttk.Frame(timing_frame)
         auto_hide_frame.pack(fill=tk.X, pady=(10, 0))
         ttk.Checkbutton(auto_hide_frame, 
                     text="Tự động ẩn khi video overlay chạy hết", 
                     variable=auto_hide_var).pack(anchor=tk.W)
-        ttk.Label(auto_hide_frame, 
-                text="(Tránh bị đứng hình ở frame cuối)", 
-                font=("Arial", 8), foreground="gray").pack(anchor=tk.W, padx=(20, 0))
+
+        # --- Position section with dynamic controls ---
+        position_frame = ttk.LabelFrame(main_frame, text="📍 Vị trí", padding="10")
+        position_frame.pack(fill=tk.X, pady=(0, 10))
         
-        layout_frame = ttk.LabelFrame(main_frame, text="Vị trí & Kích thước", padding="10")
-        layout_frame.pack(fill=tk.X, pady=(0, 10))
+        # Position mode selection
+        mode_frame = ttk.Frame(position_frame)
+        mode_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Position
-        pos_frame = ttk.Frame(layout_frame)
-        pos_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(pos_frame, text="Vị trí:").pack(side=tk.LEFT)
-        ttk.Combobox(pos_frame, textvariable=position_var, 
-                    values=["center", "top-left", "top-right", "bottom-left", "bottom-right"], 
-                    state="readonly", width=15).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Radiobutton(mode_frame, text="Vị trí mặc định", variable=position_mode_var, 
+                    value="preset").pack(side=tk.LEFT, padx=(0, 20))
+        ttk.Radiobutton(mode_frame, text="Tùy chỉnh X,Y", variable=position_mode_var, 
+                    value="custom").pack(side=tk.LEFT)
         
-        # Size
-        size_frame = ttk.Frame(layout_frame)
-        size_frame.pack(fill=tk.X, pady=2)
-        ttk.Label(size_frame, text="Kích thước (% chiều cao):").pack(side=tk.LEFT)
-        ttk.Entry(size_frame, textvariable=size_var, width=10).pack(side=tk.LEFT, padx=(10, 0))
+        # Container for dynamic position controls
+        position_controls_frame = ttk.Frame(position_frame)
+        position_controls_frame.pack(fill=tk.X, pady=5)
         
-        # Simplified Chroma Key section
-        chroma_frame = ttk.LabelFrame(main_frame, text="Xóa nền (Chroma Key)", padding="10")
+        # Preset positions frame
+        preset_frame = ttk.Frame(position_controls_frame)
+        ttk.Label(preset_frame, text="Vị trí:").pack(side=tk.LEFT)
+        position_combo = ttk.Combobox(preset_frame, textvariable=position_preset_var, 
+                                    values=["center", "top-left", "top-right", "bottom-left", "bottom-right"], 
+                                    state="readonly", width=15)
+        position_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Custom position frame
+        custom_pos_frame = ttk.Frame(position_controls_frame)
+        ttk.Label(custom_pos_frame, text="X:").pack(side=tk.LEFT)
+        ttk.Entry(custom_pos_frame, textvariable=custom_x_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
+        ttk.Label(custom_pos_frame, text="Y:").pack(side=tk.LEFT)
+        ttk.Entry(custom_pos_frame, textvariable=custom_y_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
+        ttk.Label(custom_pos_frame, text="(mặc định: X=300, Y=1600)", 
+                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT)
+
+        # --- Size section with dynamic controls ---
+        size_frame = ttk.LabelFrame(main_frame, text="📏 Kích thước", padding="10")
+        size_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        # Size mode selection
+        size_mode_frame = ttk.Frame(size_frame)
+        size_mode_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        ttk.Radiobutton(size_mode_frame, text="Theo phần trăm", variable=size_mode_var, 
+                    value="percentage").pack(side=tk.LEFT, padx=(0, 20))
+        ttk.Radiobutton(size_mode_frame, text="Tùy chỉnh W,H", variable=size_mode_var, 
+                    value="custom").pack(side=tk.LEFT)
+        
+        # Container for dynamic size controls
+        size_controls_frame = ttk.Frame(size_frame)
+        size_controls_frame.pack(fill=tk.X, pady=5)
+        
+        # Percentage size frame
+        percent_frame = ttk.Frame(size_controls_frame)
+        ttk.Label(percent_frame, text="Phần trăm (% chiều cao):").pack(side=tk.LEFT)
+        ttk.Entry(percent_frame, textvariable=size_percent_var, width=8).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Custom size frame
+        custom_size_frame = ttk.Frame(size_controls_frame)
+        ttk.Label(custom_size_frame, text="Width:").pack(side=tk.LEFT)
+        ttk.Entry(custom_size_frame, textvariable=custom_width_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
+        ttk.Label(custom_size_frame, text="Height:").pack(side=tk.LEFT)
+        ttk.Entry(custom_size_frame, textvariable=custom_height_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
+        ttk.Label(custom_size_frame, text="(mặc định: W=500, H=600)", 
+                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT)
+
+        # --- Dynamic show/hide functions ---
+        def update_position_controls(*args):
+            """Hiển thị controls phù hợp cho position mode"""
+            if position_mode_var.get() == "preset":
+                custom_pos_frame.pack_forget()
+                preset_frame.pack(fill=tk.X)
+            else:
+                preset_frame.pack_forget()
+                custom_pos_frame.pack(fill=tk.X)
+        
+        def update_size_controls(*args):
+            """Hiển thị controls phù hợp cho size mode"""
+            if size_mode_var.get() == "percentage":
+                custom_size_frame.pack_forget()
+                percent_frame.pack(fill=tk.X)
+            else:
+                percent_frame.pack_forget()
+                custom_size_frame.pack(fill=tk.X)
+        
+        # Bind mode changes
+        position_mode_var.trace('w', update_position_controls)
+        size_mode_var.trace('w', update_size_controls)
+        
+        # Initial setup
+        update_position_controls()
+        update_size_controls()
+
+        # --- Chroma Key section ---
+        chroma_frame = ttk.LabelFrame(main_frame, text="🎨 Xóa nền (Chroma Key)", padding="10")
         chroma_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Enable chroma key
         ttk.Checkbutton(chroma_frame, text="Xóa nền video overlay", variable=chroma_enabled_var).pack(anchor=tk.W, pady=(0, 10))
         
-        # Color selection
         color_frame = ttk.Frame(chroma_frame)
         color_frame.pack(fill=tk.X, pady=(0, 10))
         ttk.Label(color_frame, text="Chọn màu nền cần xóa:").pack(side=tk.LEFT)
@@ -587,73 +697,66 @@ class VideoEditorGUI:
                     state="readonly", width=12)
         color_combo.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Current settings display
         settings_label = ttk.Label(chroma_frame, text="", font=("Arial", 9), foreground="blue")
         settings_label.pack(anchor=tk.W)
         
-        # Update settings display when color changes
         def update_settings_display(*args):
             color = chroma_color_var.get()
             if color in OPTIMAL_CHROMA_REMOVAL:
                 similarity, blend = OPTIMAL_CHROMA_REMOVAL[color]
                 settings_label.config(text=f"Tự động áp dụng: Similarity={similarity}, Blend={blend}")
-                # Update custom controls
-                custom_similarity_var.set(similarity)
-                custom_blend_var.set(blend)
+                custom_similarity_var.set(f"{similarity:.3f}")
+                custom_blend_var.set(f"{blend:.3f}")
             else:
                 settings_label.config(text="Sử dụng settings mặc định")
-                custom_similarity_var.set(0.15)
-                custom_blend_var.set(0.1)
+                custom_similarity_var.set("0.150")
+                custom_blend_var.set("0.100")
         
         chroma_color_var.trace('w', update_settings_display)
-        update_settings_display()  # Initial update
+        update_settings_display()
         
-        # Advanced mode toggle
         ttk.Checkbutton(chroma_frame, text="Hiển thị cài đặt nâng cao", variable=advanced_mode_var).pack(anchor=tk.W, pady=(10, 0))
         
-        # Advanced controls frame (initially hidden)
+        # Advanced controls frame với Entry thay vì Scale
         advanced_frame = ttk.Frame(chroma_frame)
         
         # Similarity control
         sim_frame = ttk.Frame(advanced_frame)
-        sim_frame.pack(fill=tk.X, pady=2)
+        sim_frame.pack(fill=tk.X, pady=5)
         ttk.Label(sim_frame, text="Similarity:").pack(side=tk.LEFT)
-        similarity_scale = ttk.Scale(sim_frame, from_=0.001, to=0.5, variable=custom_similarity_var, orient=tk.HORIZONTAL, length=150)
-        similarity_scale.pack(side=tk.LEFT, padx=(10, 5))
-        similarity_value_label = ttk.Label(sim_frame, text="0.200")
-        similarity_value_label.pack(side=tk.LEFT)
+        similarity_entry = ttk.Entry(sim_frame, textvariable=custom_similarity_var, width=10)
+        similarity_entry.pack(side=tk.LEFT, padx=(10, 5))
+        ttk.Label(sim_frame, text="(0.001-0.500)", font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
         
         # Blend control
         blend_frame = ttk.Frame(advanced_frame)
-        blend_frame.pack(fill=tk.X, pady=2)
+        blend_frame.pack(fill=tk.X, pady=5)
         ttk.Label(blend_frame, text="Blend:").pack(side=tk.LEFT)
-        blend_scale = ttk.Scale(blend_frame, from_=0.001, to=0.5, variable=custom_blend_var, orient=tk.HORIZONTAL, length=150)
-        blend_scale.pack(side=tk.LEFT, padx=(10, 5))
-        blend_value_label = ttk.Label(blend_frame, text="0.150")
-        blend_value_label.pack(side=tk.LEFT)
+        blend_entry = ttk.Entry(blend_frame, textvariable=custom_blend_var, width=10)
+        blend_entry.pack(side=tk.LEFT, padx=(10, 5))
+        ttk.Label(blend_frame, text="(0.001-0.500)", font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
         
-        # Update value labels
-        def update_similarity_label(*args):
-            similarity_value_label.config(text=f"{custom_similarity_var.get():.3f}")
-        def update_blend_label(*args):
-            blend_value_label.config(text=f"{custom_blend_var.get():.3f}")
+        # Help text
+        help_frame = ttk.Frame(advanced_frame)
+        help_frame.pack(fill=tk.X, pady=(10, 0))
+        help_text = ttk.Label(help_frame, 
+                            text="💡 Số càng nhỏ = khử màu càng nghiêm ngặt\n"
+                                "   Số càng lớn = khử màu càng lỏng lẻo", 
+                            font=("Arial", 8), foreground="blue")
+        help_text.pack(anchor=tk.W)
         
-        custom_similarity_var.trace('w', update_similarity_label)
-        custom_blend_var.trace('w', update_blend_label)
-        
-        # Show/hide advanced controls
         def toggle_advanced_mode(*args):
             if advanced_mode_var.get():
                 advanced_frame.pack(fill=tk.X, pady=(5, 0))
             else:
                 advanced_frame.pack_forget()
-                # Reset to optimal values when hiding
                 update_settings_display()
         
         advanced_mode_var.trace('w', toggle_advanced_mode)
-        
+
+        # --- Control buttons ---
         button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(10, 0))
+        button_frame.pack(fill=tk.X, pady=(20, 0))
         
         def save_video_overlay():
             try:
@@ -662,7 +765,7 @@ class VideoEditorGUI:
                     messagebox.showerror("Lỗi", "Vui lòng chọn video!")
                     return
                     
-                # Tìm đường dẫn video gốc từ tên file
+                # Find video path
                 video_path = None
                 for f in video_files:
                     if os.path.basename(f) == selected_video:
@@ -671,53 +774,98 @@ class VideoEditorGUI:
                         
                 start_time = float(start_var.get())
                 duration = float(duration_var.get()) if duration_var.get().strip() else None
-                size = int(size_var.get())
                 
-                # Lấy chroma settings
+                # Process position settings
+                position_mode = position_mode_var.get()
+                if position_mode == "preset":
+                    position = position_preset_var.get()
+                    custom_x = None
+                    custom_y = None
+                else:
+                    position = "custom"
+                    custom_x = int(custom_x_var.get())
+                    custom_y = int(custom_y_var.get())
+                
+                # Process size settings
+                size_mode = size_mode_var.get()
+                if size_mode == "percentage":
+                    size_percent = int(size_percent_var.get())
+                    custom_width = None
+                    custom_height = None
+                else:
+                    size_percent = None
+                    custom_width = int(custom_width_var.get())
+                    custom_height = int(custom_height_var.get())
+                
+                # Chroma settings
                 chroma_color = chroma_color_var.get()
                 
                 if advanced_mode_var.get():
-                    # Use custom values from sliders
-                    similarity = custom_similarity_var.get()
-                    blend = custom_blend_var.get()
-                    print(f"DEBUG GUI: Using advanced mode - similarity={similarity}, blend={blend}")
+                    # Validate user input
+                    try:
+                        similarity = float(custom_similarity_var.get())
+                        blend = float(custom_blend_var.get())
+                        
+                        # Clamp values
+                        similarity = max(0.001, min(0.500, similarity))
+                        blend = max(0.001, min(0.500, blend))
+                        
+                    except ValueError:
+                        messagebox.showerror("Lỗi", "Similarity và Blend phải là số từ 0.001 đến 0.500")
+                        return
                 else:
-                    # Use optimal values for selected color
                     similarity, blend = OPTIMAL_CHROMA_REMOVAL.get(chroma_color, (0.15, 0.1))
-                    print(f"DEBUG GUI: Using optimal for {chroma_color} - similarity={similarity}, blend={blend}")
                 
                 self.video_overlay_settings = {
                     'enabled': True,
                     'video_path': video_path,
                     'start_time': start_time,
                     'duration': duration,
-                    'position': position_var.get(),
-                    'size_percent': size,
+                    'position_mode': position_mode,
+                    'position': position,
+                    'custom_x': custom_x,
+                    'custom_y': custom_y,
+                    'size_mode': size_mode,
+                    'size_percent': size_percent,
+                    'custom_width': custom_width,
+                    'custom_height': custom_height,
                     'chroma_key': chroma_enabled_var.get(),
                     'chroma_color': chroma_color,
                     'chroma_similarity': similarity,
                     'chroma_blend': blend,
-                    'auto_hide': auto_hide_var.get()  # NEW: Save auto hide setting
+                    'auto_hide': auto_hide_var.get()
                 }
                 
-                # DEBUG: In ra toàn bộ settings
-                print(f"DEBUG GUI: video_overlay_settings={self.video_overlay_settings}")
-                
                 # Update status message
+                if position_mode == "custom":
+                    pos_text = f"X={custom_x}, Y={custom_y}"
+                else:
+                    pos_text = position
+                    
+                if size_mode == "custom":
+                    size_text = f"W={custom_width}, H={custom_height}"
+                else:
+                    size_text = f"{size_percent}%"
+                    
                 auto_hide_text = " (auto-hide)" if auto_hide_var.get() else " (freeze)"
+                
                 self.video_overlay_status.config(
-                    text=f"Đã cấu hình: {selected_video} | {chroma_color} ({similarity:.3f}, {blend:.3f}){auto_hide_text}", 
+                    text=f"✅ {selected_video} | {pos_text} | {size_text} | {chroma_color} ({similarity:.3f}, {blend:.3f}){auto_hide_text}", 
                     foreground="green"
                 )
                 
-                self.log_message(f"Saved chroma: {chroma_color} với optimal settings ({similarity:.3f}, {blend:.3f}), auto_hide={auto_hide_var.get()}")
+                self.log_message(f"🎬 Cấu hình video overlay: {selected_video}")
+                self.log_message(f"   📍 Vị trí: {pos_text}")
+                self.log_message(f"   📏 Kích thước: {size_text}")
+                self.log_message(f"   🎨 Chroma: {chroma_color} ({similarity:.3f}, {blend:.3f})")
+                
                 dialog.destroy()
                 
             except Exception as e:
                 messagebox.showerror("Lỗi", f"Giá trị không hợp lệ: {e}")
 
-        ttk.Button(button_frame, text="Lưu", command=save_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
-        ttk.Button(button_frame, text="Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
+        ttk.Button(button_frame, text="✅ Lưu", command=save_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
+        ttk.Button(button_frame, text="❌ Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
     
     def _get_chroma_values_for_preset(self, color, preset):
         """Convert color + preset thành similarity, blend values"""
@@ -889,7 +1037,11 @@ class VideoEditorGUI:
             output_video_path = self.output_video_path.get()
             source_language = self.source_language.get()
             target_language = self.target_language.get()
-            img_folder = self.img_folder_path.get()
+            
+            # FIX: Kiểm tra thư mục ảnh có được chọn thực sự không
+            img_folder_raw = self.img_folder_path.get().strip()
+            img_folder = img_folder_raw if img_folder_raw and os.path.exists(img_folder_raw) else None
+            
             video_overlay_settings = self.video_overlay_settings
             overlay_times = self.overlay_times if self.overlay_times else None
             words_per_line = self.words_per_line.get()
@@ -899,47 +1051,52 @@ class VideoEditorGUI:
                 messagebox.showwarning("Thiếu thông tin", "Vui lòng chọn file video đầu vào và vị trí lưu file đầu ra.")
                 return
 
-            # --- BỔ SUNG LOGIC TỰ ĐỘNG ÁP DỤNG CHROMA CUSTOM ---
-            if not video_overlay_settings or not video_overlay_settings.get('enabled', False):
-                # Có thể chỉ định sẵn một video overlay mặc định nếu muốn, hoặc để None
-                self.video_overlay_settings = {
-                    'enabled': True,
-                    'video_path': None,       # Nếu muốn mặc định là None, hoặc chỉ định path overlay video
-                    'start_time': 2,
-                    'duration': 8,
-                    'position': 'top-right',
-                    'size_percent': 25,
-                    'chroma_key': True,
-                    'chroma_color': 'green',
-                    'chroma_sensitivity': 'custom'
-                }
-                video_overlay_settings = self.video_overlay_settings
-            # --- END ---
+            # Log thông tin xử lý
+            print(" Cấu hình xử lý:")
+            print(f"    Video input: {input_video_path}")
+            print(f"    Video output: {output_video_path}")
+            print(f"    Ngôn ngữ: {source_language} → {target_language}")
+            
+            if img_folder:
+                print(f"    Thư mục ảnh: {img_folder}")
+                if overlay_times:
+                    print(f"    Overlay times: {len(overlay_times)} ảnh")
+                else:
+                    print(f"    Không có cấu hình overlay times")
+            else:
+                print(f"    Không sử dụng ảnh overlay")
+                
+            if video_overlay_settings and video_overlay_settings.get('enabled', False):
+                print(f"    Video overlay: Có")
+            else:
+                print(f"    Video overlay: Không")
 
-            self.status_label.config(text="⏳ Đang xử lý... Vui lòng chờ.")
+            self.status_label.config(text=" Đang xử lý... Vui lòng chờ.")
             self.progress_var.set(0)
             self.progress_bar.start()
 
-            # Thực hiện xử lý trong thread riêng để không block GUI
+            # Thực hiện xử lý trong thread riêng
             def worker():
                 try:
-                    self.log_message("🚀 Bắt đầu xử lý video tự động...")
-                    editor = AutoVideoEditor()  # import ở đầu file: from main import AutoVideoEditor
+                    self.log_message(" Bắt đầu xử lý video tự động...")
+                    editor = AutoVideoEditor()
                     editor.process_video(
                         input_video_path=input_video_path,
                         output_video_path=output_video_path,
                         source_language=source_language,
                         target_language=target_language,
-                        img_folder=img_folder,
+                        img_folder=img_folder,  # Có thể là None
                         overlay_times=overlay_times,
                         video_overlay_settings=video_overlay_settings,
                         words_per_line=words_per_line
                     )
-                    self.status_label.config(text="✅ Hoàn thành!")
-                    self.log_message("✅ Xử lý xong! File kết quả đã lưu.")
+                    self.status_label.config(text=" Hoàn thành!")
+                    self.log_message(" Xử lý xong! File kết quả đã lưu.")
                 except Exception as e:
-                    self.status_label.config(text="❌ Lỗi xử lý!")
-                    self.log_message(f"❌ Lỗi: {e}")
+                    self.status_label.config(text=" Lỗi xử lý!")
+                    self.log_message(f" Lỗi: {e}")
+                    import traceback
+                    self.log_message(f"Chi tiết lỗi: {traceback.format_exc()}")
                 finally:
                     self.progress_bar.stop()
                     self.progress_var.set(0)
@@ -947,8 +1104,8 @@ class VideoEditorGUI:
             threading.Thread(target=worker, daemon=True).start()
 
         except Exception as e:
-            self.status_label.config(text="❌ Lỗi xử lý!")
-            self.log_message(f"❌ Lỗi: {e}")
+            self.status_label.config(text=" Lỗi xử lý!")
+            self.log_message(f" Lỗi: {e}")
 
 
 def main():
