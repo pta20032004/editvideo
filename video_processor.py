@@ -137,34 +137,21 @@ class VideoProcessor:
         except Exception as e:
             raise Exception(f"Không thể tạo audio trống: {str(e)}")
     
-    def add_subtitle_to_video(self, video_path, subtitle_path, output_path, img_folder=None, overlay_times=None):
+    def add_subtitle_to_video(self, video_path, subtitle_path, output_path):
         """
-        Ghép phụ đề, ảnh và video overlay vào video
+        Chỉ ghép phụ đề vào video (không có overlay ảnh)
         
         Args:
             video_path (str): Đường dẫn đến file video
             subtitle_path (str): Đường dẫn đến file phụ đề .srt
-            output_path (str): Đường dẫn lưu video có phụ đề và overlay
-            img_folder (str): Thư mục chứa ảnh/video overlay (None = không sử dụng ảnh)
-            overlay_times (dict): Thông tin thời gian overlay (None = không sử dụng)
+            output_path (str): Đường dẫn lưu video có phụ đề
         """
         try:
-            # FIX: Kiểm tra rõ ràng img_folder
-            print(f" Kiểm tra cấu hình overlay:")
-            print(f"    img_folder: {img_folder}")
-            print(f"    overlay_times: {'Có' if overlay_times else 'Không'}")
+            print("📝 Ghép phụ đề vào video...")
+            self._add_subtitle_only(video_path, subtitle_path, output_path)
             
-            # FIX: Chỉ xử lý ảnh khi img_folder được cung cấp và tồn tại
-            if img_folder and os.path.exists(img_folder) and overlay_times:
-                print(f" Sử dụng ảnh overlay từ: {img_folder}")
-                self._add_subtitle_and_media_overlay(video_path, subtitle_path, output_path, img_folder, overlay_times)
-            else:
-                # FIX: Chỉ ghép phụ đề, không tìm ảnh
-                print(f" Chỉ ghép phụ đề (không có ảnh)")
-                self._add_subtitle_only(video_path, subtitle_path, output_path)
-                
         except Exception as e:
-            raise Exception(f"Không thể ghép phụ đề và overlay vào video: {str(e)}")
+            raise Exception(f"Không thể ghép phụ đề vào video: {str(e)}")
     
     def _add_subtitle_and_media_overlay(self, video_path, subtitle_path, output_path, img_folder="img", overlay_times=None):
         """

@@ -38,13 +38,13 @@ class AutoVideoEditor:
         return colors.get(color_name.lower(), "0x00ff00")    
     
     def process_video(self, input_video_path, output_video_path, source_language='vi', target_language='en', 
-                 img_folder=None, overlay_times=None, video_overlay_settings=None, custom_timeline=False, words_per_line=7):
+                 video_overlay_settings=None, words_per_line=7):
         """
         Xử lý video chính theo các bước:
         1. Trích xuất audio
         2. Tạo phụ đề từ audio
-        3. Dịch phụ đề sang tiếng Anh
-        4. Ghép phụ đề vào video
+        3. Dịch phụ đề sang tiếng đích
+        4. Ghép phụ đề và video overlay vào video
         5. Chuyển đổi tỉ lệ khung hình thành 9:16
         
         Args:
@@ -52,40 +52,21 @@ class AutoVideoEditor:
             output_video_path (str): Đường dẫn video output
             source_language (str): Ngôn ngữ gốc
             target_language (str): Ngôn ngữ đích
-            img_folder (str): Thư mục chứa ảnh overlay (có thể None)
-            overlay_times (dict): Thông tin thời gian overlay ảnh
             video_overlay_settings (dict): Cấu hình video overlay với chroma key
-            custom_timeline (bool): Sử dụng timeline tùy chỉnh cho 3 ảnh
             words_per_line (int): Số từ mỗi dòng phụ đề
         """
         print("🎬 Bắt đầu xử lý video...")
         
-        # FIX: Log cấu hình rõ ràng
         print("🎯 Cấu hình xử lý:")
         print(f"   📹 Input: {input_video_path}")
         print(f"   💾 Output: {output_video_path}")
         print(f"   🌐 Ngôn ngữ: {source_language} → {target_language}")
-        
-        if img_folder:
-            print(f"   🖼️ Thư mục ảnh: {img_folder}")
-            if os.path.exists(img_folder):
-                print(f"   ✅ Thư mục ảnh tồn tại")
-                if overlay_times:
-                    print(f"   ⏰ Có {len(overlay_times)} cấu hình overlay ảnh")
-                else:
-                    print(f"   ⏰ Không có cấu hình overlay times")
-            else:
-                print(f"   ❌ Thư mục ảnh không tồn tại, bỏ qua ảnh overlay")
-                img_folder = None
-        else:
-            print(f"   🖼️ Không sử dụng ảnh overlay")
         
         if video_overlay_settings and video_overlay_settings.get('enabled', False):
             print(f"   🎬 Video overlay: Có")
         else:
             print(f"   🎬 Video overlay: Không")
         
-        print(f"   📝 Custom timeline: {custom_timeline}")
         print(f"   📄 Words per line: {words_per_line}")
         print("=" * 50)
         
@@ -119,16 +100,13 @@ class AutoVideoEditor:
                 target_lang=target_language
             )
             
-            # Bước 4: Ghép phụ đề và overlay vào video
-            print("🎞️ Bước 4: Ghép phụ đề và overlay vào video...")
+            # Bước 4: Ghép phụ đề và video overlay vào video
+            print("🎞️ Bước 4: Ghép phụ đề và video overlay vào video...")
             video_with_subtitle_path = os.path.join(temp_dir, "video_with_subtitle.mp4")
             
             # Xử lý video overlay nếu có
             if video_overlay_settings and video_overlay_settings.get('enabled', False):
                 print("🎬 Đang xử lý video overlay với chroma key...")
-                
-                # DEBUG: In ra toàn bộ video_overlay_settings
-                print(f"DEBUG MAIN: video_overlay_settings={video_overlay_settings}")
                 
                 try:
                     temp_video_overlay_path = os.path.join(temp_dir, "temp_with_video_overlay.mp4")
@@ -145,35 +123,26 @@ class AutoVideoEditor:
                             temp_dir
                         )
                     else:
-                        # Xử lý single overlay (từ GUI) với parameters mới
+                        # Xử lý single overlay
                         from video_overlay import add_video_overlay_with_chroma
                         settings = video_overlay_settings
-                        
-                        # DEBUG: In ra settings được truyền vào
-                        print(f"DEBUG MAIN: Single overlay settings={settings}")
                         
                         # Lấy chroma parameters từ GUI settings
                         chroma_color = settings.get('chroma_color', 'green')
                         chroma_similarity = settings.get('chroma_similarity', 0.2)
                         chroma_blend = settings.get('chroma_blend', 0.15)
                         
-                        # DEBUG: In ra chroma values
-                        print(f"DEBUG MAIN: chroma_color={chroma_color}, similarity={chroma_similarity}, blend={chroma_blend}")
-                        
                         # Convert color name to hex
                         if not str(chroma_color).startswith('0x'):
                             chroma_color = self._get_chroma_color(chroma_color)
                         
-                        # NEW: Extract position and size parameters
+                        # Extract position and size parameters
                         position_mode = settings.get('position_mode', 'preset')
                         custom_x = settings.get('custom_x')
                         custom_y = settings.get('custom_y')
                         size_mode = settings.get('size_mode', 'percentage')
                         custom_width = settings.get('custom_width')
                         custom_height = settings.get('custom_height')
-                        
-                        print(f"DEBUG MAIN: Position mode={position_mode}, custom_x={custom_x}, custom_y={custom_y}")
-                        print(f"DEBUG MAIN: Size mode={size_mode}, custom_width={custom_width}, custom_height={custom_height}")
                         
                         # Gọi hàm overlay với tất cả parameters
                         add_video_overlay_with_chroma(
@@ -189,7 +158,6 @@ class AutoVideoEditor:
                             chroma_similarity=chroma_similarity,
                             chroma_blend=chroma_blend,
                             auto_hide=settings.get('auto_hide', True),
-                            # NEW: Pass custom position and size parameters
                             position_mode=position_mode,
                             custom_x=custom_x,
                             custom_y=custom_y,
@@ -198,112 +166,25 @@ class AutoVideoEditor:
                             custom_height=custom_height
                         )
                     
-                    # Sau đó thêm phụ đề và image overlay lên video đã có video overlay
-                    if img_folder and overlay_times and os.path.exists(img_folder):
-                        print("🖼️ Thêm image overlay và phụ đề...")
-                        self.video_processor.add_subtitle_to_video(
-                            temp_video_overlay_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path,
-                            img_folder,
-                            overlay_times
-                        )
-                    else:
-                        # Chỉ thêm phụ đề
-                        print("📝 Chỉ thêm phụ đề...")
-                        self.video_processor.add_subtitle_to_video(
-                            temp_video_overlay_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path
-                        )
+                    # Sau đó thêm phụ đề lên video đã có video overlay
+                    print("📝 Thêm phụ đề...")
+                    self.video_processor.add_subtitle_to_video(
+                        temp_video_overlay_path,
+                        translated_subtitle_path,
+                        video_with_subtitle_path
+                    )
                     
                 except Exception as e:
-                    print(f"⚠️ Lỗi video overlay: {e}, sử dụng phương pháp cũ...")
-                    # Fallback về phương pháp cũ nếu có lỗi
-                    if img_folder and overlay_times and os.path.exists(img_folder):
-                        self.video_processor.add_subtitle_to_video(
-                            input_video_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path,
-                            img_folder,
-                            overlay_times
-                        )
-                    else:
-                        self.video_processor.add_subtitle_to_video(
-                            input_video_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path
-                        )
-            
-            # Xử lý image overlay và phụ đề (nếu không có video overlay)
-            elif img_folder and os.path.exists(img_folder):  # FIX: Kiểm tra cả img_folder và exists
-                print(f"🖼️ Xử lý ảnh overlay từ thư mục: {img_folder}")
-                
-                # Kiểm tra nếu sử dụng custom timeline
-                if custom_timeline:
-                    print("🎯 Sử dụng custom timeline cho 3 ảnh...")
-                    try:
-                        from video_overlay import add_images_with_custom_timeline
-                        success = add_images_with_custom_timeline(
-                            input_video_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path,
-                            img_folder
-                        )
-                        if not success:
-                            print("⚠️ Custom timeline thất bại, sử dụng phương pháp cũ...")
-                            self.video_processor.add_subtitle_to_video(
-                                input_video_path,
-                                translated_subtitle_path,
-                                video_with_subtitle_path
-                            )
-                    except ImportError:
-                        print("⚠️ Module video_overlay không có, sử dụng phương pháp cũ...")
-                        self.video_processor.add_subtitle_to_video(
-                            input_video_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path
-                        )
-                elif overlay_times:
-                    # Sử dụng video overlay module với multiple overlays
-                    try:
-                        from video_overlay import add_multiple_overlays
-                        success = add_multiple_overlays(
-                            input_video_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path,
-                            img_folder,
-                            overlay_times
-                        )
-                        if not success:
-                            print("⚠️ Overlay thất bại, sử dụng phương pháp cũ...")
-                            self.video_processor.add_subtitle_to_video(
-                                input_video_path,
-                                translated_subtitle_path,
-                                video_with_subtitle_path,
-                                img_folder,
-                                overlay_times
-                            )
-                    except ImportError:
-                        print("⚠️ Module video_overlay không có, sử dụng phương pháp cũ...")
-                        self.video_processor.add_subtitle_to_video(
-                            input_video_path,
-                            translated_subtitle_path,
-                            video_with_subtitle_path,
-                            img_folder,
-                            overlay_times
-                        )
-                else:
-                    # Chỉ ghép phụ đề với thư mục ảnh (không có overlay times)
-                    print("📝 Ghép phụ đề với thư mục ảnh (không có cấu hình overlay times)...")
+                    print(f"⚠️ Lỗi video overlay: {e}, chỉ ghép phụ đề...")
+                    # Fallback về phương pháp chỉ ghép phụ đề
                     self.video_processor.add_subtitle_to_video(
                         input_video_path,
                         translated_subtitle_path,
                         video_with_subtitle_path
                     )
             else:
-                # FIX: Chỉ ghép phụ đề (không có ảnh overlay)
-                print("📝 Chỉ ghép phụ đề (không có ảnh overlay)...")
+                # Chỉ ghép phụ đề (không có video overlay)
+                print("📝 Chỉ ghép phụ đề (không có video overlay)...")
                 self.video_processor.add_subtitle_to_video(
                     input_video_path,
                     translated_subtitle_path,

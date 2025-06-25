@@ -129,15 +129,8 @@ class VideoEditorGUI:
         
         # Tooltip
         ttk.Label(lang_frame, text="(4-12 từ, khuyến nghị 6-7)", 
-                 font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
+                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
         
-        row += 1
-        
-        # Image folder selection
-        ttk.Label(main_frame, text="🖼️ Thư mục ảnh:").grid(row=row, column=0, sticky=tk.W, pady=5)
-        img_entry = ttk.Entry(main_frame, textvariable=self.img_folder_path)
-        img_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(10, 5), pady=5)
-        ttk.Button(main_frame, text="Chọn thư mục", command=self.select_img_folder).grid(row=row, column=2, padx=(5, 0), pady=5)
         row += 1
         
         # Video overlay folder selection
@@ -145,26 +138,24 @@ class VideoEditorGUI:
         video_entry = ttk.Entry(main_frame, textvariable=self.video_folder_path)
         video_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(10, 5), pady=5)
         ttk.Button(main_frame, text="Chọn thư mục", command=self.select_video_folder).grid(row=row, column=2, padx=(5, 0), pady=5)
-        row += 1        # Overlay configuration
+        row += 1
+        
+        # Video overlay configuration
         overlay_frame = ttk.Frame(main_frame)
         overlay_frame.grid(row=row, column=0, columnspan=3, pady=(10, 10), sticky=(tk.W, tk.E))
         
-        ttk.Button(overlay_frame, text="⏰ Cấu hình thời gian Overlay Ảnh", command=self.configure_overlay_timing).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(overlay_frame, text="🎬 Cấu hình Video Overlay + Chroma Key", command=self.configure_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
         row += 1
         
-        # Status labels
-        self.timing_status = ttk.Label(main_frame, text="Chưa cấu hình overlay ảnh", foreground="gray")
-        self.timing_status.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=2)
-        row += 1
-        
+        # Status label
         self.video_overlay_status = ttk.Label(main_frame, text="Chưa cấu hình video overlay", foreground="gray")
         self.video_overlay_status.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=2)
         row += 1
-          # Process button
+        
+        # Process button
         self.process_button = ttk.Button(
             main_frame,
-            text="🚀 Bắt đầu xử lý (Phụ đề + Ảnh + Video Overlay + 9:16)",
+            text="🚀 Bắt đầu xử lý (Phụ đề + Video Overlay + 9:16)",
             command=self.start_processing,
             style="Accent.TButton"
         )
@@ -203,7 +194,7 @@ class VideoEditorGUI:
         
         # Initial log
         self.log_message("🎬 GUI Video Overlay đã sẵn sàng!")
-        self.log_message("💡 Hướng dẫn: Chọn video, cấu hình overlay, bắt đầu xử lý")
+        self.log_message("💡 Hướng dẫn: Chọn video, cấu hình video overlay, bắt đầu xử lý")
 
     def select_input_video(self):
         """Chọn file video đầu vào"""
@@ -503,15 +494,15 @@ class VideoEditorGUI:
         start_var = tk.StringVar(value="2")
         duration_var = tk.StringVar(value="10")
         
-        # Position settings
-        position_mode_var = tk.StringVar(value="preset")
+        # Position settings - ĐỔI MẶC ĐỊNH THÀNH "custom"
+        position_mode_var = tk.StringVar(value="custom")  # ĐÃ THAY ĐỔI
         position_preset_var = tk.StringVar(value="top-right")
         custom_x_var = tk.StringVar(value="300")
         custom_y_var = tk.StringVar(value="1600")
         
-        # Size settings  
+        # Size settings - ĐỔI MẶC ĐỊNH THÀNH 50%
         size_mode_var = tk.StringVar(value="percentage")
-        size_percent_var = tk.StringVar(value="25")
+        size_percent_var = tk.StringVar(value="50")  # ĐÃ THAY ĐỔI TỪ "25" THÀNH "50"
         custom_width_var = tk.StringVar(value="500")
         custom_height_var = tk.StringVar(value="600")
         
@@ -591,32 +582,24 @@ class VideoEditorGUI:
                     text="Tự động ẩn khi video overlay chạy hết", 
                     variable=auto_hide_var).pack(anchor=tk.W)
 
-        # --- Position section with dynamic controls ---
+        # --- Position section with dynamic controls - THAY ĐỔI THỨ TỰ ---
         position_frame = ttk.LabelFrame(main_frame, text="📍 Vị trí", padding="10")
         position_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Position mode selection
+        # Position mode selection - ĐẨY "Tùy chỉnh X,Y" LÊN TRƯỚC
         mode_frame = ttk.Frame(position_frame)
         mode_frame.pack(fill=tk.X, pady=(0, 10))
         
-        ttk.Radiobutton(mode_frame, text="Vị trí mặc định", variable=position_mode_var, 
-                    value="preset").pack(side=tk.LEFT, padx=(0, 20))
         ttk.Radiobutton(mode_frame, text="Tùy chỉnh X,Y", variable=position_mode_var, 
-                    value="custom").pack(side=tk.LEFT)
+                    value="custom").pack(side=tk.LEFT, padx=(0, 20))  # ĐẨY LÊN TRƯỚC
+        ttk.Radiobutton(mode_frame, text="Vị trí mặc định", variable=position_mode_var, 
+                    value="preset").pack(side=tk.LEFT)  # ĐẨY XUỐNG SAU
         
         # Container for dynamic position controls
         position_controls_frame = ttk.Frame(position_frame)
         position_controls_frame.pack(fill=tk.X, pady=5)
         
-        # Preset positions frame
-        preset_frame = ttk.Frame(position_controls_frame)
-        ttk.Label(preset_frame, text="Vị trí:").pack(side=tk.LEFT)
-        position_combo = ttk.Combobox(preset_frame, textvariable=position_preset_var, 
-                                    values=["center", "top-left", "top-right", "bottom-left", "bottom-right"], 
-                                    state="readonly", width=15)
-        position_combo.pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Custom position frame
+        # Custom position frame - ĐẶT TRƯỚC
         custom_pos_frame = ttk.Frame(position_controls_frame)
         ttk.Label(custom_pos_frame, text="X:").pack(side=tk.LEFT)
         ttk.Entry(custom_pos_frame, textvariable=custom_x_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
@@ -624,6 +607,14 @@ class VideoEditorGUI:
         ttk.Entry(custom_pos_frame, textvariable=custom_y_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
         ttk.Label(custom_pos_frame, text="(mặc định: X=300, Y=1600)", 
                 font=("Arial", 8), foreground="gray").pack(side=tk.LEFT)
+        
+        # Preset positions frame - ĐẶT SAU
+        preset_frame = ttk.Frame(position_controls_frame)
+        ttk.Label(preset_frame, text="Vị trí:").pack(side=tk.LEFT)
+        position_combo = ttk.Combobox(preset_frame, textvariable=position_preset_var, 
+                                    values=["center", "top-left", "top-right", "bottom-left", "bottom-right"], 
+                                    state="readonly", width=15)
+        position_combo.pack(side=tk.LEFT, padx=(10, 0))
 
         # --- Size section with dynamic controls ---
         size_frame = ttk.LabelFrame(main_frame, text="📏 Kích thước", padding="10")
@@ -646,6 +637,8 @@ class VideoEditorGUI:
         percent_frame = ttk.Frame(size_controls_frame)
         ttk.Label(percent_frame, text="Phần trăm (% chiều cao):").pack(side=tk.LEFT)
         ttk.Entry(percent_frame, textvariable=size_percent_var, width=8).pack(side=tk.LEFT, padx=(10, 0))
+        ttk.Label(percent_frame, text="(mặc định: 50%)", 
+                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))  # CẬP NHẬT TOOLTIP
         
         # Custom size frame
         custom_size_frame = ttk.Frame(size_controls_frame)
@@ -679,7 +672,7 @@ class VideoEditorGUI:
         position_mode_var.trace('w', update_position_controls)
         size_mode_var.trace('w', update_size_controls)
         
-        # Initial setup
+        # Initial setup - VÌ MẶC ĐỊNH LÀ "custom" NÊN HIỂN THI custom_pos_frame TRƯỚC
         update_position_controls()
         update_size_controls()
 
@@ -1030,20 +1023,14 @@ class VideoEditorGUI:
         self.root.update_idletasks()
 
     def start_processing(self):
-        """Bắt đầu xử lý video với các tuỳ chọn hiện tại"""
+        """Bắt đầu xử lý video với video overlay"""
         try:
             # Lấy thông tin từ GUI
             input_video_path = self.input_video_path.get()
             output_video_path = self.output_video_path.get()
             source_language = self.source_language.get()
             target_language = self.target_language.get()
-            
-            # FIX: Kiểm tra thư mục ảnh có được chọn thực sự không
-            img_folder_raw = self.img_folder_path.get().strip()
-            img_folder = img_folder_raw if img_folder_raw and os.path.exists(img_folder_raw) else None
-            
             video_overlay_settings = self.video_overlay_settings
-            overlay_times = self.overlay_times if self.overlay_times else None
             words_per_line = self.words_per_line.get()
 
             # Kiểm tra đầu vào
@@ -1052,49 +1039,38 @@ class VideoEditorGUI:
                 return
 
             # Log thông tin xử lý
-            print(" Cấu hình xử lý:")
+            print("🎯 Cấu hình xử lý:")
             print(f"    Video input: {input_video_path}")
             print(f"    Video output: {output_video_path}")
             print(f"    Ngôn ngữ: {source_language} → {target_language}")
             
-            if img_folder:
-                print(f"    Thư mục ảnh: {img_folder}")
-                if overlay_times:
-                    print(f"    Overlay times: {len(overlay_times)} ảnh")
-                else:
-                    print(f"    Không có cấu hình overlay times")
-            else:
-                print(f"    Không sử dụng ảnh overlay")
-                
             if video_overlay_settings and video_overlay_settings.get('enabled', False):
                 print(f"    Video overlay: Có")
             else:
                 print(f"    Video overlay: Không")
 
-            self.status_label.config(text=" Đang xử lý... Vui lòng chờ.")
+            self.status_label.config(text="🎬 Đang xử lý... Vui lòng chờ.")
             self.progress_var.set(0)
             self.progress_bar.start()
 
             # Thực hiện xử lý trong thread riêng
             def worker():
                 try:
-                    self.log_message(" Bắt đầu xử lý video tự động...")
+                    self.log_message("🎬 Bắt đầu xử lý video tự động...")
                     editor = AutoVideoEditor()
                     editor.process_video(
                         input_video_path=input_video_path,
                         output_video_path=output_video_path,
                         source_language=source_language,
                         target_language=target_language,
-                        img_folder=img_folder,  # Có thể là None
-                        overlay_times=overlay_times,
                         video_overlay_settings=video_overlay_settings,
                         words_per_line=words_per_line
                     )
-                    self.status_label.config(text=" Hoàn thành!")
-                    self.log_message(" Xử lý xong! File kết quả đã lưu.")
+                    self.status_label.config(text="✅ Hoàn thành!")
+                    self.log_message("✅ Xử lý xong! File kết quả đã lưu.")
                 except Exception as e:
-                    self.status_label.config(text=" Lỗi xử lý!")
-                    self.log_message(f" Lỗi: {e}")
+                    self.status_label.config(text="❌ Lỗi xử lý!")
+                    self.log_message(f"❌ Lỗi: {e}")
                     import traceback
                     self.log_message(f"Chi tiết lỗi: {traceback.format_exc()}")
                 finally:
@@ -1104,9 +1080,8 @@ class VideoEditorGUI:
             threading.Thread(target=worker, daemon=True).start()
 
         except Exception as e:
-            self.status_label.config(text=" Lỗi xử lý!")
-            self.log_message(f" Lỗi: {e}")
-
+            self.status_label.config(text="❌ Lỗi xử lý!")
+            self.log_message(f"❌ Lỗi: {e}")
 
 def main():
     root = tk.Tk()
