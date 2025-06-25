@@ -229,7 +229,7 @@ class VideoEditorGUI:
             self.output_video_path.set(file_path)
             self.log_message(f"💾 Đã chọn vị trí lưu: {os.path.basename(file_path)}")
     
-    def select_img_folder(self):
+    
         """Chọn thư mục chứa ảnh overlay"""
         folder_path = filedialog.askdirectory(
             title="Chọn thư mục chứa ảnh overlay"
@@ -272,7 +272,7 @@ class VideoEditorGUI:
             else:
                 self.log_message(" Không tìm thấy file video nào trong thư mục")
 
-    def configure_overlay_timing(self):
+    
         """Cấu hình thời gian overlay ảnh"""
         if not self.img_folder_path.get():
             messagebox.showwarning("Cảnh báo", "Vui lòng chọn thư mục ảnh trước!")
@@ -290,7 +290,7 @@ class VideoEditorGUI:
             return
         self.show_overlay_timing_dialog(img_files)
     
-    def show_overlay_timing_dialog(self, img_files):
+    
         """Dialog cấu hình thời gian overlay ảnh với animation"""
         dialog = tk.Toplevel(self.root)
         dialog.title(" Cấu hình Overlay Ảnh + Animation")
