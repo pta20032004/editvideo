@@ -38,9 +38,9 @@ class AutoVideoEditor:
         return colors.get(color_name.lower(), "0x00ff00")    
     
     def process_video(self, input_video_path, output_video_path, source_language='vi', target_language='en', 
-             video_overlay_settings=None, words_per_line=7, enable_subtitle=True):
+                 video_overlay_settings=None, words_per_line=7, enable_subtitle=True):
         """
-        Xử lý video chính theo các bước - FIXED VIDEO OVERLAY LOGIC
+        Xử lý video chính theo các bước - FIXED ORDER: Convert 9:16 TRƯỚC overlay
         """
         print("🎬 Bắt đầu xử lý video...")
         
@@ -65,7 +65,7 @@ class AutoVideoEditor:
             
             translated_subtitle_path = None
             
-            # THÊM ĐIỀU KIỆN CHO PHỤ ĐỀ
+            # BƯỚC 1-3: XỬ LÝ PHỤ ĐỀ (nếu enable)
             if enable_subtitle:
                 # Bước 1: Trích xuất audio từ video
                 print("🎵 Bước 1: Trích xuất audio từ video...")
@@ -94,15 +94,22 @@ class AutoVideoEditor:
             else:
                 print("📝 Bỏ qua tạo phụ đề (enable_subtitle=False)")
             
-            # Bước 4: Ghép video overlay (và phụ đề nếu có)
-            video_with_effects_path = os.path.join(temp_dir, "video_with_effects.mp4")
+            # ⭐ BƯỚC 4: CHUYỂN ĐỔI 9:16 TRƯỚC (KEY CHANGE!)
+            print("📱 Bước 4: Chuyển đổi tỉ lệ khung hình thành 9:16 TRƯỚC...")
+            video_9_16_path = os.path.join(temp_dir, "video_9_16.mp4")
+            self.aspect_converter.convert_to_9_16(
+                input_video_path,
+                video_9_16_path
+            )
             
-            # KIỂM TRA VIDEO OVERLAY CÓ HỢP LẸ KHÔNG
+            # BƯỚC 5: CHÈN VIDEO OVERLAY (trên video 9:16)
+            current_video = video_9_16_path  # Sử dụng video 9:16 làm base
+            
+            # Kiểm tra video overlay có hợp lệ không
             should_add_overlay = False
             overlay_video_path = None
             
             if video_overlay_settings and video_overlay_settings.get('enabled', False):
-                # Kiểm tra có video overlay path không
                 overlay_video_path = video_overlay_settings.get('video_path', '')
                 
                 if overlay_video_path and os.path.exists(overlay_video_path):
@@ -113,10 +120,10 @@ class AutoVideoEditor:
             
             # Xử lý video overlay nếu có
             if should_add_overlay:
-                print("🎞️ Bước 4: Ghép video overlay + phụ đề...")
+                print("🎞️ Bước 5: Chèn video overlay (trên video 9:16)...")
                 
                 try:
-                    temp_video_overlay_path = os.path.join(temp_dir, "temp_with_video_overlay.mp4")
+                    video_with_overlay_path = os.path.join(temp_dir, "video_9_16_with_overlay.mp4")
                     
                     # Kiểm tra nếu có multiple overlays
                     if 'multiple_overlays' in video_overlay_settings:
@@ -124,8 +131,8 @@ class AutoVideoEditor:
                         overlays = video_overlay_settings['multiple_overlays']
                         print(f"🎬 Xử lý {len(overlays)} video overlay...")
                         self._process_multiple_video_overlays(
-                            input_video_path, 
-                            temp_video_overlay_path, 
+                            current_video,  # Sử dụng video 9:16
+                            video_with_overlay_path, 
                             overlays, 
                             temp_dir
                         )
@@ -153,11 +160,11 @@ class AutoVideoEditor:
                         
                         print(f"🎨 Chroma key: {chroma_color} (similarity={chroma_similarity}, blend={chroma_blend})")
                         
-                        # Gọi hàm overlay với tất cả parameters
+                        # Gọi hàm overlay với video 9:16
                         add_video_overlay_with_chroma(
-                            main_video_path=input_video_path,
-                            overlay_video_path=overlay_video_path,  # SỬA: dùng biến đã validate
-                            output_path=temp_video_overlay_path,
+                            main_video_path=current_video,  # Video 9:16
+                            overlay_video_path=overlay_video_path,
+                            output_path=video_with_overlay_path,
                             start_time=settings.get('start_time', 2),
                             duration=settings.get('duration', 10),
                             position=settings.get('position', 'center'),
@@ -175,54 +182,26 @@ class AutoVideoEditor:
                             custom_height=custom_height
                         )
                     
-                    # Sau đó thêm phụ đề lên video đã có video overlay (nếu enable_subtitle)
-                    if enable_subtitle and translated_subtitle_path:
-                        print("📝 Thêm phụ đề lên video overlay...")
-                        self.video_processor.add_subtitle_to_video(
-                            temp_video_overlay_path,
-                            translated_subtitle_path,
-                            video_with_effects_path
-                        )
-                    else:
-                        # Chỉ có video overlay, không có phụ đề
-                        import shutil
-                        shutil.copy2(temp_video_overlay_path, video_with_effects_path)
+                    current_video = video_with_overlay_path  # Update current video
                     
                 except Exception as e:
                     print(f"⚠️ Lỗi video overlay: {e}")
-                    print("🔄 Fallback: Xử lý không có video overlay...")
-                    # Fallback: xử lý như không có video overlay
-                    if enable_subtitle and translated_subtitle_path:
-                        self.video_processor.add_subtitle_to_video(
-                            input_video_path,
-                            translated_subtitle_path,
-                            video_with_effects_path
-                        )
-                    else:
-                        # Không có gì để thêm, copy nguyên file
-                        import shutil
-                        shutil.copy2(input_video_path, video_with_effects_path)
-            else:
-                # Không có video overlay
-                if enable_subtitle and translated_subtitle_path:
-                    print("🎞️ Bước 4: Chỉ ghép phụ đề (không có video overlay)...")
-                    self.video_processor.add_subtitle_to_video(
-                        input_video_path,
-                        translated_subtitle_path,
-                        video_with_effects_path
-                    )
-                else:
-                    # Không có gì để thêm, copy nguyên file
-                    print("🎞️ Bước 4: Không có phụ đề và video overlay, copy nguyên file...")
-                    import shutil
-                    shutil.copy2(input_video_path, video_with_effects_path)
+                    print("🔄 Fallback: Tiếp tục với video 9:16 không có overlay...")
+                    # current_video vẫn là video_9_16_path
             
-            # Bước 5: Chuyển đổi tỉ lệ khung hình thành 9:16
-            print("📱 Bước 5: Chuyển đổi tỉ lệ khung hình thành 9:16...")
-            self.aspect_converter.convert_to_9_16(
-                video_with_effects_path,
-                output_video_path
-            )
+            # BƯỚC 6: THÊM PHỤ ĐỀ (trên video 9:16 + overlay)
+            if enable_subtitle and translated_subtitle_path:
+                print("📝 Bước 6: Thêm phụ đề (trên video 9:16 + overlay)...")
+                self.video_processor.add_subtitle_to_video(
+                    current_video,  # Video 9:16 (có thể có overlay)
+                    translated_subtitle_path,
+                    output_video_path
+                )
+            else:
+                # Không có phụ đề, copy video hiện tại ra output
+                print("📝 Bước 6: Không có phụ đề, copy video ra output...")
+                import shutil
+                shutil.copy2(current_video, output_video_path)
             
             print(f"✅ Hoàn thành! Video đã được lưu tại: {output_video_path}")
             
@@ -238,13 +217,13 @@ class AutoVideoEditor:
             raise
 
 def _process_multiple_video_overlays(self, input_video_path, output_path, settings_list, temp_dir):
-    """Xử lý nhiều video overlay với custom position và size"""
-    current_video = input_video_path
+    """Xử lý nhiều video overlay với custom position và size - UPDATED for 9:16"""
+    current_video = input_video_path  # Đây giờ là video 9:16
     
     for i, settings in enumerate(settings_list):
         temp_output = os.path.join(temp_dir, f"temp_overlay_{i}.mp4")
         
-        print(f"🎬 Áp dụng video overlay {i+1}/{len(settings_list)}...")
+        print(f"🎬 Áp dụng video overlay {i+1}/{len(settings_list)} (trên video 9:16)...")
         
         from video_overlay import add_video_overlay_with_chroma
         
@@ -270,7 +249,7 @@ def _process_multiple_video_overlays(self, input_video_path, output_path, settin
             chroma_similarity = 0.2
             chroma_blend = 0.15
         
-        # NEW: Extract position and size parameters cho multiple overlays
+        # Extract position and size parameters cho multiple overlays
         position_mode = settings.get('position_mode', 'preset')
         custom_x = settings.get('custom_x')
         custom_y = settings.get('custom_y')
@@ -279,7 +258,7 @@ def _process_multiple_video_overlays(self, input_video_path, output_path, settin
         custom_height = settings.get('custom_height')
         
         add_video_overlay_with_chroma(
-            main_video_path=current_video,
+            main_video_path=current_video,  # Video 9:16
             overlay_video_path=settings['video_path'],
             output_path=temp_output,
             start_time=settings.get('start_time', 0),
@@ -290,7 +269,7 @@ def _process_multiple_video_overlays(self, input_video_path, output_path, settin
             color=chroma_color,  # Sử dụng alias từ test_chroma_key.py
             similarity=chroma_similarity,  # Sử dụng alias từ test_chroma_key.py
             auto_hide=settings.get('auto_hide', True),
-            # NEW: Pass custom parameters for multiple overlays
+            # Pass custom parameters for multiple overlays
             position_mode=position_mode,
             custom_x=custom_x,
             custom_y=custom_y,

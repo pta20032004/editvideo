@@ -142,16 +142,17 @@ class VideoProcessor:
         Chỉ ghép phụ đề vào video (không có overlay ảnh)
         
         Args:
-            video_path (str): Đường dẫn đến file video
+            video_path (str): Đường dẫn đến file video 
             subtitle_path (str): Đường dẫn đến file phụ đề .srt
             output_path (str): Đường dẫn lưu video có phụ đề
         """
         try:
             print("📝 Ghép phụ đề vào video...")
-            self._add_subtitle_only(video_path, subtitle_path, output_path)
+            self._add_subtitle_only(video_path, subtitle_path, output_path)  # Giữ nguyên hàm cũ
             
         except Exception as e:
             raise Exception(f"Không thể ghép phụ đề vào video: {str(e)}")
+
     
     def _add_subtitle_and_media_overlay(self, video_path, subtitle_path, output_path, img_folder="img", overlay_times=None):
         """
@@ -285,15 +286,17 @@ class VideoProcessor:
     
     def _add_subtitle_only(self, video_path, subtitle_path, output_path):
         """
-        Chỉ ghép phụ đề vào video (không có overlay)
+        Chỉ ghép phụ đề vào video (không có overlay) - GIỮ NGUYÊN NHU CŨ
         """
         try:
             subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
             
             font_path = self._get_font_path()
             if font_path:
+                # GIỮ NGUYÊN: FontSize=8, Outline=1, MarginV=100
                 subtitle_filter = f"subtitles='{subtitle_path_escaped}':fontsdir='{font_path}':force_style='FontName=Plus Jakarta Sans,FontSize=8,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=1,Shadow=1,MarginV=100'"
             else:
+                # GIỮ NGUYÊN: FontSize=8, Outline=1, MarginV=50  
                 subtitle_filter = f"subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=8,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=1,Shadow=1,MarginV=50'"
             
             cmd = [
