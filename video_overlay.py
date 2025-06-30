@@ -135,7 +135,7 @@ def get_video_duration(video_path):
 def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_path, 
                                  start_time=0, duration=None, position="center", 
                                  size_percent=30, chroma_key=True, chroma_color="0x00ff00",
-                                 chroma_similarity=0.1, chroma_blend=0.1, 
+                                 chroma_similarity=0.2, chroma_blend=0.2, 
                                  color=None, similarity=None, auto_hide=True,
                                  # NEW: Custom position and size parameters
                                  position_mode="preset", custom_x=None, custom_y=None,
@@ -247,13 +247,18 @@ def add_video_overlay_with_chroma(main_video_path, overlay_video_path, output_pa
         
         filter_parts.append(scale_filter)
         
+        # ===== ĐIỂM THAY ĐỔI 1: THÊM FILTER SETPTS ĐỂ RESET TIMELINE =====
+        # Reset timeline của overlay video bằng setpts để luôn bắt đầu từ frame đầu
+        setpts_filter = f"[scaled]setpts=PTS-STARTPTS+{start_time}/TB[timed_scaled]"
+        filter_parts.append(setpts_filter)
+        
         # Apply chroma key if needed
         if chroma_key:
-            chromakey_filter = f"[scaled]chromakey={chroma_color}:{chroma_similarity}:{chroma_blend}[keyed]"
+            chromakey_filter = f"[timed_scaled]chromakey={chroma_color}:{chroma_similarity}:{chroma_blend}[keyed]"
             filter_parts.append(chromakey_filter)
             overlay_input = "keyed"
         else:
-            overlay_input = "scaled"
+            overlay_input = "timed_scaled"
         
         # Create overlay with timing
         if actual_duration:

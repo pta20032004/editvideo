@@ -13,14 +13,14 @@ import glob
 from pathlib import Path
 
 OPTIMAL_CHROMA_REMOVAL = {
-    "green": (0.2, 0.15),    # Green optimized từ testing
-    "blue": (0.18, 0.12),    # Blue cần tolerance cao hơn
-    "black": (0.01, 0.005),  # Black cần precision
-    "white": (0.02, 0.01),   # White precision nhưng không khắt khe như black
-    "cyan": (0.12, 0.08),    # Cyan dễ key
-    "red": (0.25, 0.2),      # Red khó key nhất
-    "magenta": (0.18, 0.12), # Tương tự blue
-    "yellow": (0.22, 0.18)   # Khó vì conflict với skin tone
+    "green": (0.2, 0.2),    # Green optimized từ testing
+    "blue": (0.18, 0.18),    # Blue cần tolerance cao hơn
+    "black": (0.01, 0.01),  # Black cần precision
+    "white": (0.02, 0.02),   # White precision nhưng không khắt khe như black
+    "cyan": (0.12, 0.12),    # Cyan dễ key
+    "red": (0.25, 0.25),      # Red khó key nhất
+    "magenta": (0.18, 0.18), # Tương tự blue
+    "yellow": (0.22, 0.22)   # Khó vì conflict với skin tone
 }
 # Import main application
 try:
@@ -54,9 +54,9 @@ class VideoEditorGUI:
         self.animation_config = {}
         self.video_overlay_settings = {
             'enabled': True,  # MẶC ĐỊNH BẬT
-            'chroma_color': 'black',  # MẶC ĐỊNH BLACK
-            'chroma_similarity': 0.01,
-            'chroma_blend': 0.005,
+            'chroma_color': 'green',  # MẶC ĐỊNH BLACK
+            'chroma_similarity': 0.2,
+            'chroma_blend': 0.2,
             
             # KHÔI PHỤC LẠI SETTINGS GỐC CỦA BẠN
             'position_mode': 'custom',    # Tùy chỉnh
@@ -67,8 +67,8 @@ class VideoEditorGUI:
             'size_mode': 'percentage',    # Theo phần trăm
             'size_percent': 50,           # 50% (không phải 25%)
             
-            'start_time': 2,
-            'duration': 10,
+            'start_time': 5,
+            'duration': 15,
             'auto_hide': True
         }
         
@@ -173,7 +173,7 @@ class VideoEditorGUI:
         row += 1
         
         # Status label - HIỂN THỊ MẶC ĐỊNH
-        self.video_overlay_status = ttk.Label(main_frame, text="✅ Sẵn sàng: Black chroma key (0.010, 0.005) | x=300, y=1600 | 50%", foreground="green")
+        self.video_overlay_status = ttk.Label(main_frame, text="✅ Sẵn sàng: Green chroma key (0.20, 0.20) | x=300, y=1600 | 50%", foreground="green")
         self.video_overlay_status.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=2)
         row += 1
         
@@ -219,7 +219,7 @@ class VideoEditorGUI:
         
         # Initial log - CẬP NHẬT MESSAGE
         self.log_message("🎬 GUI Batch Video Processing đã sẵn sàng!")
-        self.log_message("💡 Mặc định: Black chroma key, tạo phụ đề, video overlay enabled")
+        self.log_message("💡 Mặc định: Green chroma key, tạo phụ đề, video overlay enabled")
         self.log_message("📁 Hướng dẫn: Chọn thư mục input, output, sau đó bắt đầu xử lý")
 
     def select_input_folder(self):
@@ -313,7 +313,7 @@ class VideoEditorGUI:
                 # Cập nhật status hiển thị - HIỂN THỊ ĐÚNG SETTINGS
                 overlay_name = os.path.basename(video_files[0])
                 self.video_overlay_status.config(
-                    text=f"✅ Sẵn sàng: {overlay_name} | Black chroma (0.010, 0.005) | X=300, Y=1600 | 50%", 
+                    text=f"✅ Sẵn sàng: {overlay_name} | Green chroma (0.2, 0.2) | X=300, Y=1600 | 50%", 
                     foreground="green"
                 )
             else:
@@ -576,7 +576,7 @@ class VideoEditorGUI:
             else:
                 settings_label.config(text="Sử dụng settings mặc định")
                 custom_similarity_var.set("0.150")
-                custom_blend_var.set("0.100")
+                custom_blend_var.set("0.150")
         
         chroma_color_var.trace('w', update_settings_display)
         update_settings_display()
@@ -739,75 +739,75 @@ class VideoEditorGUI:
         # Tham số tối ưu cho từng màu
         color_settings = {
             "green": {
-                "loose": (0.3, 0.25),
-                "normal": (0.15, 0.1),
-                "custom": (0.2, 0.15),  # Green optimized
-                "strict": (0.08, 0.05),
-                "very_strict": (0.03, 0.02),
-                "ultra_strict": (0.01, 0.005)
+                "loose": (0.3, 0.3),
+                "normal": (0.15, 0.15),
+                "custom": (0.2, 0.2),  # Green optimized
+                "strict": (0.08, 0.08),
+                "very_strict": (0.03, 0.03),
+                "ultra_strict": (0.01, 0.01)
             },
             "black": {
-                "loose": (0.05, 0.03),
-                "normal": (0.02, 0.015),
-                "custom": (0.01, 0.005),  # Black precision
-                "strict": (0.005, 0.003),
+                "loose": (0.05, 0.05),
+                "normal": (0.02, 0.02),
+                "custom": (0.01, 0.01),  # Black precision
+                "strict": (0.005, 0.005),
                 "very_strict": (0.001, 0.001),
                 "ultra_strict": (0.0005, 0.0005)
             },
             "blue": {
-                "loose": (0.35, 0.3),
-                "normal": (0.2, 0.15),
-                "custom": (0.25, 0.2),   # Blue optimized
-                "strict": (0.1, 0.08),
-                "very_strict": (0.05, 0.03),
-                "ultra_strict": (0.02, 0.01)
+                "loose": (0.35, 0.35),
+                "normal": (0.2, 0.2),
+                "custom": (0.25, 0.25),   # Blue optimized
+                "strict": (0.1, 0.1),
+                "very_strict": (0.05, 0.05),
+                "ultra_strict": (0.02, 0.02)
             },
             "cyan": {
-                "loose": (0.25, 0.2),
-                "normal": (0.12, 0.08),
-                "custom": (0.15, 0.1),   # Cyan optimized
-                "strict": (0.06, 0.04),
-                "very_strict": (0.03, 0.02),
-                "ultra_strict": (0.01, 0.005)
+                "loose": (0.25, 0.25),
+                "normal": (0.12, 0.12),
+                "custom": (0.15, 0.15),   # Cyan optimized
+                "strict": (0.06, 0.06),
+                "very_strict": (0.03, 0.03),
+                "ultra_strict": (0.01, 0.01)
             },
             "red": {
-                "loose": (0.4, 0.35),
-                "normal": (0.25, 0.2),
-                "custom": (0.3, 0.25),   # Red optimized (harder to key)
-                "strict": (0.15, 0.1),
-                "very_strict": (0.08, 0.05),
-                "ultra_strict": (0.03, 0.02)
+                "loose": (0.4, 0.4),
+                "normal": (0.25, 0.25),
+                "custom": (0.3, 0.3),   # Red optimized (harder to key)
+                "strict": (0.15, 0.15),
+                "very_strict": (0.08, 0.08),
+                "ultra_strict": (0.03, 0.03)
             },
             "magenta": {
-                "loose": (0.3, 0.25),
-                "normal": (0.18, 0.12),
-                "custom": (0.22, 0.18),  # Magenta optimized
-                "strict": (0.1, 0.08),
-                "very_strict": (0.05, 0.03),
-                "ultra_strict": (0.02, 0.01)
+                "loose": (0.3, 0.3),
+                "normal": (0.18, 0.18),
+                "custom": (0.22, 0.22),  # Magenta optimized
+                "strict": (0.1, 0.1),
+                "very_strict": (0.05, 0.05),
+                "ultra_strict": (0.02, 0.02)
             },
             "yellow": {
-                "loose": (0.35, 0.3),
-                "normal": (0.22, 0.18),
-                "custom": (0.28, 0.22),  # Yellow optimized (skin tone conflict)
-                "strict": (0.12, 0.1),
-                "very_strict": (0.06, 0.04),
-                "ultra_strict": (0.03, 0.02)
+                "loose": (0.35, 0.35),
+                "normal": (0.22, 0.22),
+                "custom": (0.28, 0.28),  # Yellow optimized (skin tone conflict)
+                "strict": (0.12, 0.12),
+                "very_strict": (0.06, 0.06),
+                "ultra_strict": (0.03, 0.03)
             }
         }
         
         # Default fallback cho màu khác
         default_settings = {
-            "loose": (0.3, 0.25),
-            "normal": (0.15, 0.1),
-            "custom": (0.2, 0.15),
-            "strict": (0.05, 0.03),
-            "very_strict": (0.01, 0.005),
-            "ultra_strict": (0.005, 0.003)
+            "loose": (0.3, 0.3),
+            "normal": (0.15, 0.5),
+            "custom": (0.2, 0.2),
+            "strict": (0.05, 0.05),
+            "very_strict": (0.01, 0.01),
+            "ultra_strict": (0.005, 0.005)
         }
         
         color_map = color_settings.get(color.lower(), default_settings)
-        return color_map.get(preset.lower(), (0.2, 0.15))
+        return color_map.get(preset.lower(), (0.2, 0.2))
 
     def create_multiple_overlays(self, selected_video):
         """Tạo cấu hình multiple video overlay giống ảnh 2, 3"""
