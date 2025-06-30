@@ -38,9 +38,31 @@ class AutoVideoEditor:
         return colors.get(color_name.lower(), "0x00ff00")    
     
     def process_video(self, input_video_path, output_video_path, source_language='vi', target_language='en', 
-                 video_overlay_settings=None, words_per_line=7, enable_subtitle=True):
+                 img_folder=None, overlay_times=None, video_overlay_settings=None, 
+                 custom_timeline=False, words_per_line=7, enable_subtitle=True, subtitle_style=None):
         """
         Xử lý video chính theo các bước - FIXED ORDER: Convert 9:16 TRƯỚC overlay
+        
+        Args:
+            input_video_path (str): Đường dẫn video đầu vào
+            output_video_path (str): Đường dẫn video đầu ra
+            source_language (str): Ngôn ngữ gốc
+            target_language (str): Ngôn ngữ đích cho phụ đề
+            img_folder (str, optional): Thư mục chứa ảnh overlay
+            overlay_times (dict, optional): Cấu hình thời gian cho overlay
+            video_overlay_settings (dict, optional): Cấu hình video overlay
+            custom_timeline (bool): Có sử dụng custom timeline (3 ảnh) hay không
+            words_per_line (int): Số từ mỗi dòng phụ đề
+            enable_subtitle (bool): Có tạo phụ đề hay không
+            subtitle_style (dict, optional): Kiểu phụ đề 
+                {
+                    "text_color": "black",        # Màu chữ
+                    "box_style": "box",           # Kiểu khung
+                    "box_color": "white",         # Màu nền
+                    "font_name": "Arial",         # Font chữ
+                    "font_size": 24,              # Cỡ chữ
+                    "preset": "default"           # Hoặc dùng preset có sẵn
+                }
         """
         print("🎬 Bắt đầu xử lý video...")
         
@@ -56,6 +78,15 @@ class AutoVideoEditor:
             print(f"   🎬 Video overlay: Không")
         
         print(f"   📄 Words per line: {words_per_line}")
+        
+        if subtitle_style:
+            if subtitle_style.get("preset"):
+                print(f"   🎨 Kiểu phụ đề: {subtitle_style['preset']}")
+            else:
+                print(f"   🎨 Kiểu phụ đề: Tùy chỉnh")
+        else:
+            print(f"   🎨 Kiểu phụ đề: Mặc định (chữ đen nền trắng)")
+        
         print("=" * 50)
         
         try:
@@ -189,13 +220,43 @@ class AutoVideoEditor:
                     print("🔄 Fallback: Tiếp tục với video 9:16 không có overlay...")
                     # current_video vẫn là video_9_16_path
             
+            # Xử lý custom timeline nếu được bật
+            if custom_timeline and img_folder and os.path.exists(img_folder):
+                print("🎞️ Bước 5.5: Áp dụng custom timeline (3 ảnh)...")
+                try:
+                    from video_overlay import add_images_with_custom_timeline
+                    
+                    video_with_timeline_path = os.path.join(temp_dir, "video_with_timeline.mp4")
+                    
+                    # Nếu có subtitle, sử dụng nó cho custom timeline
+                    subtitle_for_timeline = translated_subtitle_path if translated_subtitle_path else None
+                    
+                    # Thêm 3 ảnh với timeline
+                    success = add_images_with_custom_timeline(
+                        current_video,
+                        subtitle_for_timeline,
+                        video_with_timeline_path,
+                        img_folder
+                    )
+                    
+                    if success:
+                        current_video = video_with_timeline_path
+                        print("✅ Áp dụng custom timeline thành công!")
+                    else:
+                        print("⚠️ Không thể áp dụng custom timeline, tiếp tục với video hiện tại")
+                    
+                except Exception as e:
+                    print(f"⚠️ Lỗi custom timeline: {e}")
+                    print("🔄 Fallback: Tiếp tục với video hiện tại...")
+            
             # BƯỚC 6: THÊM PHỤ ĐỀ (trên video 9:16 + overlay)
             if enable_subtitle and translated_subtitle_path:
                 print("📝 Bước 6: Thêm phụ đề (trên video 9:16 + overlay)...")
                 self.video_processor.add_subtitle_to_video(
                     current_video,  # Video 9:16 (có thể có overlay)
                     translated_subtitle_path,
-                    output_video_path
+                    output_video_path,
+                    subtitle_style=subtitle_style
                 )
             else:
                 # Không có phụ đề, copy video hiện tại ra output
@@ -215,7 +276,6 @@ class AutoVideoEditor:
             import traceback
             print(f"Chi tiết lỗi: {traceback.format_exc()}")
             raise
-
 def _process_multiple_video_overlays(self, input_video_path, output_path, settings_list, temp_dir):
     """Xử lý nhiều video overlay với custom position và size - UPDATED for 9:16"""
     current_video = input_video_path  # Đây giờ là video 9:16

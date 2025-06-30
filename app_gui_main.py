@@ -49,6 +49,13 @@ class VideoEditorGUI:
         self.words_per_line = tk.IntVar(value=7)
         self.processing = False
         
+        # Thêm biến cho kiểu phụ đề
+        self.subtitle_preset = tk.StringVar(value="default")
+        self.subtitle_text_color = tk.StringVar(value="black")      # ĐÃ ĐỔI: từ "white" thành "black"  
+        self.subtitle_box_style = tk.StringVar(value="box")         # ĐÃ ĐỔI: từ "outline" thành "box"
+        self.subtitle_box_color = tk.StringVar(value="white")       # ĐÃ ĐỔI: từ "black" thành "white"
+        self.subtitle_font_size = tk.IntVar(value=10)               # ĐÃ ĐỔI: từ 12 thành 10
+        
         # Overlay settings - KHÔI PHỤC LẠI SETTINGS GỐC CỦA BẠN
         self.overlay_times = {}
         self.animation_config = {}
@@ -154,7 +161,7 @@ class VideoEditorGUI:
         
         # Tooltip
         ttk.Label(lang_frame, text="(4-12 từ, khuyến nghị 6-7)", 
-                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
+                    font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
         
         row += 1
         
@@ -175,6 +182,10 @@ class VideoEditorGUI:
         # Status label - HIỂN THỊ MẶC ĐỊNH
         self.video_overlay_status = ttk.Label(main_frame, text="✅ Sẵn sàng: Green chroma key (0.20, 0.20) | x=300, y=1600 | 50%", foreground="green")
         self.video_overlay_status.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=2)
+        row += 1
+        
+        # Thêm phần tùy chỉnh phụ đề ở đây (trước nút Process)
+        self._create_subtitle_style_section(main_frame, row)
         row += 1
         
         # Process button - CẬP NHẬT TEXT
@@ -222,6 +233,221 @@ class VideoEditorGUI:
         self.log_message("💡 Mặc định: Green chroma key, tạo phụ đề, video overlay enabled")
         self.log_message("📁 Hướng dẫn: Chọn thư mục input, output, sau đó bắt đầu xử lý")
 
+
+    def _create_subtitle_style_section(self, parent, row):
+        """Tạo phần cấu hình kiểu phụ đề - ĐÃ ĐƠN GIẢN HÓA"""
+        subtitle_frame = ttk.LabelFrame(parent, text="🎨 Kiểu phụ đề", padding="10")
+        subtitle_frame.grid(row=row, column=0, columnspan=3, pady=(10, 5), sticky=(tk.W, tk.E))
+        
+        # Preset selector - CHỈ CÒN 2 LỰA CHỌN
+        preset_frame = ttk.Frame(subtitle_frame)
+        preset_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(preset_frame, text="🎨 Kiểu phụ đề:").pack(side=tk.LEFT)
+        preset_combo = ttk.Combobox(
+            preset_frame,
+            textvariable=self.subtitle_preset,
+            values=["default"],  # ĐÃ BỎ: tất cả preset khác
+            state="readonly",
+            width=12
+        )
+        preset_combo.pack(side=tk.LEFT, padx=(10, 20))
+        
+        # Mô tả kiểu - CẬP NHẬT
+        self.style_preview_label = ttk.Label(preset_frame, text="👉 Mặc định: Chữ đen, nền trắng, cỡ 10")  # ĐÃ CẬP NHẬT
+        self.style_preview_label.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Custom style button
+        ttk.Button(preset_frame, text="⚙️ Tùy chỉnh nâng cao", 
+                command=self.configure_subtitle_style).pack(side=tk.RIGHT)
+        
+        # Update preview when preset changes - ĐƠN GIẢN HÓA
+        def update_style_preview(*args):
+            preset = self.subtitle_preset.get()
+            if preset == "default":
+                self.style_preview_label.config(text="👉 Mặc định: Chữ đen, nền trắng, cỡ 10")
+            else:
+                self.style_preview_label.config(text="👉 Tùy chỉnh")
+                
+        self.subtitle_preset.trace_add("write", update_style_preview)
+        update_style_preview()
+
+    def configure_subtitle_style(self):
+        """Hiển thị dialog cấu hình kiểu phụ đề tùy chỉnh - ĐÃ CẬP NHẬT"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("🎨 Tùy chỉnh kiểu phụ đề")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        ttk.Label(main_frame, text="🎨 Tùy chỉnh kiểu phụ đề", font=("Arial", 14, "bold")).pack(pady=(0, 20))
+        
+        # Màu chữ
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(text_frame, text="Màu chữ:").pack(side=tk.LEFT)
+        text_colors = ["black", "white", "yellow", "red", "green", "blue", "cyan", "magenta", "orange", "purple", "pink"]
+        text_color_combo = ttk.Combobox(
+            text_frame,
+            textvariable=self.subtitle_text_color,
+            values=text_colors,
+            state="readonly",
+            width=12
+        )
+        text_color_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Kiểu nền
+        box_frame = ttk.Frame(main_frame)
+        box_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(box_frame, text="Kiểu nền:").pack(side=tk.LEFT)
+        box_styles = ["none", "outline", "box", "rounded_box", "shadow_box"]
+        box_style_combo = ttk.Combobox(
+            box_frame,
+            textvariable=self.subtitle_box_style,
+            values=box_styles,
+            state="readonly",
+            width=12
+        )
+        box_style_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Màu nền
+        box_color_frame = ttk.Frame(main_frame)
+        box_color_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(box_color_frame, text="Màu nền:").pack(side=tk.LEFT)
+        box_colors = ["black", "white", "yellow", "red", "green", "blue", "cyan", "magenta", "orange", "purple", "pink"]
+        box_color_combo = ttk.Combobox(
+            box_color_frame,
+            textvariable=self.subtitle_box_color,
+            values=box_colors,
+            state="readonly",
+            width=12
+        )
+        box_color_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Cỡ chữ - ĐÃ CẬP NHẬT RANGE
+        font_frame = ttk.Frame(main_frame)
+        font_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(font_frame, text="Cỡ chữ:").pack(side=tk.LEFT)
+        font_size_spinbox = ttk.Spinbox(
+            font_frame,
+            from_=6, to=24, increment=1,  # ĐÃ CẬP NHẬT: từ 8-36 thành 6-24
+            textvariable=self.subtitle_font_size,
+            width=5
+        )
+        font_size_spinbox.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Preview
+        preview_frame = ttk.LabelFrame(main_frame, text="Xem trước", padding="10")
+        preview_frame.pack(fill=tk.X, pady=(20, 10))
+        
+        preview_canvas = tk.Canvas(preview_frame, width=400, height=100, bg="black")
+        preview_canvas.pack()
+        
+        preview_text_id = preview_canvas.create_text(
+            200, 50, 
+            text="Đây là mẫu phụ đề", 
+            fill="black",  # ĐÃ ĐỔI: từ "white" thành "black"
+            font=("Arial", 10)  # ĐÃ ĐỔI: từ 18 thành 10
+        )
+        
+        # Preview background
+        preview_bg_id = preview_canvas.create_rectangle(
+            0, 0, 0, 0,
+            fill="white", outline="", state="normal"  # ĐÃ ĐỔI: từ "black" thành "white", từ "hidden" thành "normal"
+        )
+        
+        # Move background behind text
+        preview_canvas.tag_lower(preview_bg_id, preview_text_id)
+        
+        # Update preview function - ĐÃ CẬP NHẬT
+        def update_preview(*args):
+            # Update text color
+            text_color = self.subtitle_text_color.get()
+            preview_canvas.itemconfig(preview_text_id, fill=text_color)
+            
+            # Update text size
+            font_size = self.subtitle_font_size.get()
+            preview_canvas.itemconfig(preview_text_id, font=("Arial", font_size))
+            
+            # Update background
+            box_style = self.subtitle_box_style.get()
+            box_color = self.subtitle_box_color.get()
+            
+            if box_style == "none":
+                preview_canvas.itemconfig(preview_bg_id, state="hidden")
+            else:
+                # Get text bounds
+                bbox = preview_canvas.bbox(preview_text_id)
+                if bbox:
+                    # Add padding
+                    padding = 10
+                    x1, y1, x2, y2 = bbox
+                    x1 -= padding
+                    y1 -= padding
+                    x2 += padding
+                    y2 += padding
+                    
+                    preview_canvas.coords(preview_bg_id, x1, y1, x2, y2)
+                    preview_canvas.itemconfig(preview_bg_id, fill=box_color, state="normal")
+                    
+                    # For outline style, use outline instead of fill
+                    if box_style == "outline":
+                        preview_canvas.itemconfig(preview_bg_id, fill="", outline=box_color, width=1)  # ĐÃ GIẢM: từ width=2 thành width=1
+                    else:
+                        preview_canvas.itemconfig(preview_bg_id, fill=box_color, outline="")
+        
+        # Track changes to update preview
+        self.subtitle_text_color.trace_add("write", update_preview)
+        self.subtitle_box_style.trace_add("write", update_preview)
+        self.subtitle_box_color.trace_add("write", update_preview)
+        self.subtitle_font_size.trace_add("write", update_preview)
+        
+        # Initial preview update
+        update_preview()
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        def apply_style():
+            # Disable preset when using custom style
+            self.subtitle_preset.set("")
+            
+            # Update main window preview
+            self.style_preview_label.config(text=f"👉 Tùy chỉnh: Chữ {self.subtitle_text_color.get()}, nền {self.subtitle_box_color.get()}, cỡ {self.subtitle_font_size.get()}")  # ĐÃ THÊM cỡ chữ
+            
+            # Đóng dialog
+            dialog.destroy()
+        
+        apply_button = ttk.Button(
+            button_frame, 
+            text="✓ Áp dụng", 
+            command=apply_style,
+            style="Accent.TButton"
+        )
+        apply_button.pack(side=tk.LEFT, padx=(0, 10))
+        
+        ttk.Button(button_frame, text="Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
+
+    def get_subtitle_style(self):
+        """Lấy cấu hình kiểu phụ đề hiện tại"""
+        preset = self.subtitle_preset.get()
+        if preset:
+            # Dùng preset có sẵn
+            return {"preset": preset}
+        else:
+            # Dùng kiểu tùy chỉnh
+            return {
+                "text_color": self.subtitle_text_color.get(),
+                "box_style": self.subtitle_box_style.get(),
+                "box_color": self.subtitle_box_color.get(),
+                "font_size": self.subtitle_font_size.get()
+            }
+    
     def select_input_folder(self):
         """Chọn thư mục video đầu vào - MỚI"""
         folder_path = filedialog.askdirectory(
@@ -364,7 +590,7 @@ class VideoEditorGUI:
         
         # --- Các biến control ---
         video_var = tk.StringVar()
-        start_var = tk.StringVar(value="2")
+        start_var = tk.StringVar(value="0")
         duration_var = tk.StringVar(value="10")
         
         # Position settings
@@ -896,143 +1122,129 @@ class VideoEditorGUI:
         self.root.update_idletasks()
 
     def start_processing(self):
-        """Bắt đầu xử lý hàng loạt video với video overlay - UPDATED"""
-        try:
-            # Lấy thông tin từ GUI
-            input_folder_path = self.input_folder_path.get()
-            output_folder_path = self.output_folder_path.get()
-            overlay_folder_path = self.video_folder_path.get()
-            
-            # TẠO THƯ MỤC MẶC ĐỊNH NẾU CHƯA TỒN TẠI
-            if not os.path.exists(input_folder_path):
-                os.makedirs(input_folder_path, exist_ok=True)
-                self.log_message(f"📁 Đã tạo thư mục input: {input_folder_path}")
-            
-            if not os.path.exists(output_folder_path):
-                os.makedirs(output_folder_path, exist_ok=True)
-                self.log_message(f"📁 Đã tạo thư mục output: {output_folder_path}")
-                
-            # TẠO THƯ MỤC VIDEO OVERLAY MẶC ĐỊNH
-            if overlay_folder_path and not os.path.exists(overlay_folder_path):
-                os.makedirs(overlay_folder_path, exist_ok=True)
-                self.log_message(f"📁 Đã tạo thư mục video overlay: {overlay_folder_path}")
-            
-            source_language = self.source_language.get()
-            target_language = self.target_language.get()
-            words_per_line = self.words_per_line.get()
-            enable_subtitle = self.enable_subtitle.get()
+        """Bắt đầu xử lý hàng loạt"""
+        if self.processing:
+            messagebox.showwarning("Cảnh báo", "Đã có quá trình xử lý đang chạy!")
+            return
+        
+        # Validation
+        input_folder_path = self.input_folder_path.get()
+        output_folder_path = self.output_folder_path.get()
+        
+        if not input_folder_path or not output_folder_path:
+            messagebox.showwarning("Thiếu thông tin", "Vui lòng chọn thư mục video đầu vào và thư mục đầu ra.")
+            return
 
-            # Kiểm tra đầu vào
-            if not input_folder_path or not output_folder_path:
-                messagebox.showwarning("Thiếu thông tin", "Vui lòng chọn thư mục video đầu vào và thư mục đầu ra.")
-                return
+        # Tìm tất cả file video trong thư mục input
+        video_files = []
+        for ext in ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.wmv', '*.flv']:
+            video_files.extend(glob.glob(os.path.join(input_folder_path, ext)))
 
-            # Tìm tất cả file video trong thư mục input
-            video_files = []
-            for ext in ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.wmv', '*.flv']:
-                video_files.extend(glob.glob(os.path.join(input_folder_path, ext)))
+        if not video_files:
+            messagebox.showwarning("Không có video", f"Không tìm thấy file video nào trong thư mục: {input_folder_path}\n\nVui lòng thêm video vào thư mục hoặc chọn thư mục khác.")
+            return
 
-            if not video_files:
-                messagebox.showwarning("Không có video", f"Không tìm thấy file video nào trong thư mục: {input_folder_path}\n\nVui lòng thêm video vào thư mục hoặc chọn thư mục khác.")
-                return
-
-            # CHUẨN BỊ VIDEO OVERLAY SETTINGS - SỬ DỤNG FOLDER MẶC ĐỊNH
-            video_overlay_settings = self.video_overlay_settings.copy()
+        # CHUẨN BỊ VIDEO OVERLAY SETTINGS - SỬ DỤNG FOLDER MẶC ĐỊNH
+        video_overlay_settings = self.video_overlay_settings.copy()
+        
+        # Kiểm tra thư mục video overlay
+        overlay_folder_path = self.video_folder_path.get()
+        if overlay_folder_path and os.path.exists(overlay_folder_path):
+            overlay_files = []
+            for ext in ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.wmv']:
+                overlay_files.extend(glob.glob(os.path.join(overlay_folder_path, ext)))
             
-            # Kiểm tra thư mục video overlay
-            if overlay_folder_path and os.path.exists(overlay_folder_path):
-                overlay_files = []
-                for ext in ['*.mp4', '*.avi', '*.mov', '*.mkv', '*.wmv']:
-                    overlay_files.extend(glob.glob(os.path.join(overlay_folder_path, ext)))
-                
-                if overlay_files:
-                    # Sử dụng file đầu tiên làm default overlay
-                    video_overlay_settings['video_path'] = overlay_files[0]
-                    video_overlay_settings['enabled'] = True
-                    self.log_message(f"🎭 Sử dụng video overlay: {os.path.basename(overlay_files[0])} từ {overlay_folder_path}")
-                else:
-                    # Không có file overlay, disable
-                    video_overlay_settings['enabled'] = False
-                    self.log_message(f"⚠️ Thư mục {overlay_folder_path} trống, tắt chức năng overlay")
+            if overlay_files:
+                # Sử dụng file đầu tiên làm default overlay
+                video_overlay_settings['video_path'] = overlay_files[0]
+                video_overlay_settings['enabled'] = True
+                self.log_message(f"🎭 Sử dụng video overlay: {os.path.basename(overlay_files[0])} từ {overlay_folder_path}")
             else:
-                # Không có thư mục overlay, disable
+                # Không có file overlay, disable
                 video_overlay_settings['enabled'] = False
-                self.log_message("ℹ️ Không có thư mục video overlay, chỉ xử lý phụ đề + 9:16")
+                self.log_message(f"⚠️ Thư mục {overlay_folder_path} trống, tắt chức năng overlay")
+        else:
+            # Không có thư mục overlay, disable
+            video_overlay_settings['enabled'] = False
+            self.log_message("ℹ️ Không có thư mục video overlay, chỉ xử lý phụ đề + 9:16")
 
-            # Log thông tin xử lý
-            print("🎯 Cấu hình batch processing:")
-            print(f"    Input folder: {input_folder_path}")
-            print(f"    Output folder: {output_folder_path}")
-            print(f"    Overlay folder: {overlay_folder_path}")
-            print(f"    Số video: {len(video_files)}")
-            print(f"    Ngôn ngữ: {source_language} → {target_language}")
-            print(f"    Tạo phụ đề: {enable_subtitle}")
-            print(f"    Video overlay: {video_overlay_settings.get('enabled', False)}")
-            
-            if video_overlay_settings.get('enabled', False):
-                print(f"    Overlay path: {video_overlay_settings.get('video_path', 'N/A')}")
+        # Lấy cấu hình phụ đề
+        subtitle_style = self.get_subtitle_style()
+        
+        # Log thông tin xử lý
+        print("🎯 Cấu hình batch processing:")
+        print(f"    Input folder: {input_folder_path}")
+        print(f"    Output folder: {output_folder_path}")
+        print(f"    Overlay folder: {overlay_folder_path}")
+        print(f"    Số video: {len(video_files)}")
+        print(f"    Ngôn ngữ: {self.source_language.get()} → {self.target_language.get()}")
+        print(f"    Tạo phụ đề: {self.enable_subtitle.get()}")
+        print(f"    Kiểu phụ đề: {subtitle_style}")
+        print(f"    Video overlay: {video_overlay_settings.get('enabled', False)}")
+        
+        if video_overlay_settings.get('enabled', False):
+            print(f"    Overlay path: {video_overlay_settings.get('video_path', 'N/A')}")
 
-            self.status_label.config(text=f"🎬 Đang xử lý {len(video_files)} video... Vui lòng chờ.")
-            self.progress_var.set(0)
-            self.progress_bar.start()
+        self.status_label.config(text=f"🎬 Đang xử lý {len(video_files)} video... Vui lòng chờ.")
+        self.progress_var.set(0)
+        self.progress_bar.start()
 
-            # Thực hiện xử lý trong thread riêng
-            def worker():
-                try:
-                    self.log_message(f"🎬 Bắt đầu xử lý hàng loạt {len(video_files)} video...")
-                    editor = AutoVideoEditor()
-                    
-                    total_files = len(video_files)
-                    success_count = 0
-                    error_count = 0
-                    
-                    for i, input_video_path in enumerate(video_files):
-                        try:
-                            # Tạo tên file output
-                            video_name = os.path.splitext(os.path.basename(input_video_path))[0]
-                            output_video_path = os.path.join(output_folder_path, f"{video_name}_processed.mp4")
-                            
-                            self.log_message(f"📹 ({i+1}/{total_files}) Đang xử lý: {os.path.basename(input_video_path)}")
-                            
-                            # Xử lý video
-                            editor.process_video(
-                                input_video_path=input_video_path,
-                                output_video_path=output_video_path,
-                                source_language=source_language,
-                                target_language=target_language,
-                                video_overlay_settings=video_overlay_settings,
-                                words_per_line=words_per_line,
-                                enable_subtitle=enable_subtitle
-                            )
-                            
-                            success_count += 1
-                            self.log_message(f"✅ ({i+1}/{total_files}) Hoàn thành: {os.path.basename(output_video_path)}")
-                            
-                        except Exception as e:
-                            error_count += 1
-                            self.log_message(f"❌ ({i+1}/{total_files}) Lỗi: {os.path.basename(input_video_path)} - {str(e)}")
-                    
-                    # Kết quả cuối cùng
-                    self.status_label.config(text=f"✅ Hoàn thành! {success_count} thành công, {error_count} lỗi")
-                    self.log_message(f"🎉 Kết quả batch processing:")
-                    self.log_message(f"   ✅ Thành công: {success_count}")
-                    self.log_message(f"   ❌ Lỗi: {error_count}")
-                    self.log_message(f"   📁 Thư mục output: {output_folder_path}")
-                    
-                except Exception as e:
-                    self.status_label.config(text="❌ Lỗi xử lý!")
-                    self.log_message(f"❌ Lỗi batch processing: {e}")
-                    import traceback
-                    self.log_message(f"Chi tiết lỗi: {traceback.format_exc()}")
-                finally:
-                    self.progress_bar.stop()
-                    self.progress_var.set(0)
+        # Thực hiện xử lý trong thread riêng
+        def worker():
+            try:
+                self.log_message(f"🎬 Bắt đầu xử lý hàng loạt {len(video_files)} video...")
+                editor = AutoVideoEditor()
+                
+                total_files = len(video_files)
+                success_count = 0
+                error_count = 0
+                
+                for i, input_video_path in enumerate(video_files):
+                    try:
+                        # Tạo tên file output
+                        video_name = os.path.splitext(os.path.basename(input_video_path))[0]
+                        output_video_path = os.path.join(output_folder_path, f"{video_name}_processed.mp4")
+                        
+                        self.log_message(f"📹 ({i+1}/{total_files}) Đang xử lý: {os.path.basename(input_video_path)}")
+                        
+                        # Xử lý video với kiểu phụ đề
+                        editor.process_video(
+                            input_video_path=input_video_path,
+                            output_video_path=output_video_path,
+                            source_language=self.source_language.get(),
+                            target_language=self.target_language.get(),
+                            video_overlay_settings=video_overlay_settings,
+                            words_per_line=self.words_per_line.get(),
+                            enable_subtitle=self.enable_subtitle.get(),
+                            subtitle_style=subtitle_style
+                        )
+                        
+                        success_count += 1
+                        self.log_message(f"✅ ({i+1}/{total_files}) Hoàn thành: {os.path.basename(output_video_path)}")
+                        
+                    except Exception as e:
+                        error_count += 1
+                        self.log_message(f"❌ ({i+1}/{total_files}) Lỗi: {os.path.basename(input_video_path)} - {str(e)}")
+                
+                # Kết quả cuối cùng
+                self.status_label.config(text=f"✅ Hoàn thành! {success_count} thành công, {error_count} lỗi")
+                self.log_message(f"🎉 Kết quả batch processing:")
+                self.log_message(f"   ✅ Thành công: {success_count}")
+                self.log_message(f"   ❌ Lỗi: {error_count}")
+                self.log_message(f"   📁 Thư mục output: {output_folder_path}")
+                
+            except Exception as e:
+                self.status_label.config(text="❌ Lỗi xử lý!")
+                self.log_message(f"❌ Lỗi batch processing: {e}")
+                import traceback
+                self.log_message(f"Chi tiết lỗi: {traceback.format_exc()}")
+            finally:
+                self.progress_bar.stop()
+                self.progress_var.set(0)
 
-            threading.Thread(target=worker, daemon=True).start()
+        threading.Thread(target=worker, daemon=True).start()
+    
 
-        except Exception as e:
-            self.status_label.config(text="❌ Lỗi xử lý!")
-            self.log_message(f"❌ Lỗi: {e}")
 def main():
     root = tk.Tk()
     app = VideoEditorGUI(root)

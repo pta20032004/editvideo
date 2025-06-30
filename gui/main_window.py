@@ -226,7 +226,7 @@ class VideoEditorMainWindow:
         log_frame.rowconfigure(0, weight=1)
         parent.rowconfigure(row+1, weight=1)
         
-    def _create_subtitle_config_section(self, parent, start_row):
+    
         """Tạo phần cấu hình phụ đề nâng cao"""
         subtitle_frame = ttk.LabelFrame(parent, text="📝 Cấu hình Phụ đề Nâng cao", padding="10")
         subtitle_frame.grid(row=start_row, column=0, columnspan=3, pady=(10, 10), sticky=(tk.W, tk.E))
@@ -284,12 +284,7 @@ class VideoEditorMainWindow:
         )
         if filename:
             self.output_video_path.set(filename)
-            
-    def select_img_folder(self):
-        """Chọn thư mục chứa ảnh overlay"""
-        folder = filedialog.askdirectory(title="Chọn thư mục ảnh overlay")
-        if folder:
-            self.img_folder_path.set(folder)
+
             
     def select_video_folder(self):
         """Chọn thư mục chứa video overlay"""
@@ -324,9 +319,269 @@ class VideoEditorMainWindow:
         """Cấu hình animation text"""
         messagebox.showinfo("Thông tin", "Chức năng Animation Text đang được phát triển.\\n\\nHiện tại bạn có thể sử dụng Custom Timeline để áp dụng 3 ảnh với animation:\\n- Ảnh 1: fade in/out\\n- Ảnh 2: slide left\\n- Ảnh 3: zoom in")
         
-    # Processing methods
+    
+    def _create_subtitle_config_section(self, parent, start_row):
+        """Tạo phần cấu hình phụ đề nâng cao"""
+        subtitle_frame = ttk.LabelFrame(parent, text="📝 Cấu hình Phụ đề Nâng cao", padding="10")
+        subtitle_frame.grid(row=start_row, column=0, columnspan=3, pady=(10, 10), sticky=(tk.W, tk.E))
+        
+        # Words per line configuration
+        words_config_frame = ttk.Frame(subtitle_frame)
+        words_config_frame.pack(fill=tk.X, pady=5)
+        
+        ttk.Label(words_config_frame, text="📱 Từ mỗi dòng phụ đề:", 
+                font=("Arial", 10, "bold")).pack(side=tk.LEFT)
+        
+        words_spinbox = ttk.Spinbox(
+            words_config_frame,
+            from_=4, to=12,
+            textvariable=self.words_per_line,
+            width=5,
+            state="readonly"
+        )
+        words_spinbox.pack(side=tk.LEFT, padx=(10, 5))
+        
+        # Preview button
+        def preview_subtitle_split():
+            """Preview cách chia dòng phụ đề"""
+            self.show_subtitle_preview()
+        
+        ttk.Button(words_config_frame, text="👁️ Xem trước", 
+                command=preview_subtitle_split).pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Subtitle style settings
+        style_frame = ttk.Frame(subtitle_frame)
+        style_frame.pack(fill=tk.X, pady=(10, 5))
+        
+        # Khởi tạo biến cho style phụ đề (nếu chưa có)
+        if not hasattr(self, 'subtitle_preset'):
+            self.subtitle_preset = tk.StringVar(value="default")
+        if not hasattr(self, 'subtitle_text_color'):
+            self.subtitle_text_color = tk.StringVar(value="black")
+        if not hasattr(self, 'subtitle_box_style'):
+            self.subtitle_box_style = tk.StringVar(value="box")
+        if not hasattr(self, 'subtitle_box_color'):
+            self.subtitle_box_color = tk.StringVar(value="white")
+        if not hasattr(self, 'subtitle_font_size'):
+            self.subtitle_font_size = tk.IntVar(value=24)
+        
+        # Preset selector
+        ttk.Label(style_frame, text="🎨 Kiểu phụ đề:", font=("Arial", 10, "bold")).pack(side=tk.LEFT)
+        preset_combo = ttk.Combobox(
+            style_frame,
+            textvariable=self.subtitle_preset,
+            values=["default", "tiktok", "youtube", "instagram", "modern", "classic"],
+            state="readonly",
+            width=12
+        )
+        preset_combo.pack(side=tk.LEFT, padx=(10, 20))
+        
+        # Advanced style button
+        ttk.Button(style_frame, text="⚙️ Tùy chỉnh nâng cao", command=self.configure_subtitle_style).pack(side=tk.LEFT)
+        
+        # Info label
+        info_text = "💡 6-7 từ tối ưu cho TikTok/Instagram • 4-5 từ cho video nhanh • 8+ từ cho desktop"
+        ttk.Label(subtitle_frame, text=info_text, 
+                font=("Arial", 9), foreground="blue").pack(pady=(5, 0))
+        
+        # Benefits
+        benefits_text = "✨ Dễ đọc trên mobile • Tăng engagement • Tự động phân bổ thời gian"
+        ttk.Label(subtitle_frame, text=benefits_text, 
+                font=("Arial", 9), foreground="green").pack()
+        
+        # Style preview
+        self.style_preview_label = ttk.Label(subtitle_frame, text="👉 Mẫu: Chữ đen, nền trắng", font=("Arial", 10))
+        self.style_preview_label.pack(pady=(5, 0))
+        
+        # Update preview when preset changes
+        def update_style_preview(*args):
+            preset = self.subtitle_preset.get()
+            if preset == "default":
+                self.style_preview_label.config(text="👉 Mẫu: Chữ đen, nền trắng")
+            elif preset == "tiktok":
+                self.style_preview_label.config(text="👉 Mẫu: Chữ trắng, nền đen lớn")
+            elif preset == "youtube":
+                self.style_preview_label.config(text="👉 Mẫu: Chữ trắng, viền đen")
+            elif preset == "instagram":
+                self.style_preview_label.config(text="👉 Mẫu: Chữ trắng, nền trong suốt")
+            elif preset == "modern":
+                self.style_preview_label.config(text="👉 Mẫu: Chữ trắng, nền xanh")
+            elif preset == "classic":
+                self.style_preview_label.config(text="👉 Mẫu: Chữ vàng, viền đen")
+                
+        self.subtitle_preset.trace_add("write", update_style_preview)
+        update_style_preview()
+
+    def configure_subtitle_style(self):
+        """Hiển thị dialog cấu hình kiểu phụ đề tùy chỉnh"""
+        dialog = tk.Toplevel(self.root)
+        dialog.title("🎨 Tùy chỉnh kiểu phụ đề")
+        dialog.geometry("500x400")
+        dialog.transient(self.root)
+        dialog.grab_set()
+        
+        main_frame = ttk.Frame(dialog, padding="20")
+        main_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Title
+        ttk.Label(main_frame, text="🎨 Tùy chỉnh kiểu phụ đề", font=("Arial", 14, "bold")).pack(pady=(0, 20))
+        
+        # Màu chữ
+        text_frame = ttk.Frame(main_frame)
+        text_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(text_frame, text="Màu chữ:").pack(side=tk.LEFT)
+        text_colors = ["black", "white", "yellow", "red", "green", "blue", "cyan", "magenta", "orange", "purple", "pink"]
+        text_color_combo = ttk.Combobox(
+            text_frame,
+            textvariable=self.subtitle_text_color,
+            values=text_colors,
+            state="readonly",
+            width=12
+        )
+        text_color_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Kiểu nền
+        box_frame = ttk.Frame(main_frame)
+        box_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(box_frame, text="Kiểu nền:").pack(side=tk.LEFT)
+        box_styles = ["none", "outline", "box", "rounded_box", "shadow_box"]
+        box_style_combo = ttk.Combobox(
+            box_frame,
+            textvariable=self.subtitle_box_style,
+            values=box_styles,
+            state="readonly",
+            width=12
+        )
+        box_style_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Màu nền
+        box_color_frame = ttk.Frame(main_frame)
+        box_color_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(box_color_frame, text="Màu nền:").pack(side=tk.LEFT)
+        box_colors = ["black", "white", "yellow", "red", "green", "blue", "cyan", "magenta", "orange", "purple", "pink"]
+        box_color_combo = ttk.Combobox(
+            box_color_frame,
+            textvariable=self.subtitle_box_color,
+            values=box_colors,
+            state="readonly",
+            width=12
+        )
+        box_color_combo.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Cỡ chữ
+        font_frame = ttk.Frame(main_frame)
+        font_frame.pack(fill=tk.X, pady=5)
+        ttk.Label(font_frame, text="Cỡ chữ:").pack(side=tk.LEFT)
+        font_size_spinbox = ttk.Spinbox(
+            font_frame,
+            from_=12, to=36, increment=2,
+            textvariable=self.subtitle_font_size,
+            width=5
+        )
+        font_size_spinbox.pack(side=tk.LEFT, padx=(10, 0))
+        
+        # Preview
+        preview_frame = ttk.LabelFrame(main_frame, text="Xem trước", padding="10")
+        preview_frame.pack(fill=tk.X, pady=(20, 10))
+        
+        preview_canvas = tk.Canvas(preview_frame, width=400, height=100, bg="black")
+        preview_canvas.pack()
+        
+        preview_text_id = preview_canvas.create_text(
+            200, 50, 
+            text="Đây là mẫu phụ đề", 
+            fill="white", 
+            font=("Arial", 18)
+        )
+        
+        # Preview background
+        preview_bg_id = preview_canvas.create_rectangle(
+            0, 0, 0, 0,  # Will be updated
+            fill="black", outline="", state="hidden"
+        )
+        
+        # Move background behind text
+        preview_canvas.tag_lower(preview_bg_id, preview_text_id)
+        
+        # Update preview function
+        def update_preview(*args):
+            # Update text color
+            text_color = self.subtitle_text_color.get()
+            preview_canvas.itemconfig(preview_text_id, fill=text_color)
+            
+            # Update text size
+            font_size = self.subtitle_font_size.get()
+            preview_canvas.itemconfig(preview_text_id, font=("Arial", font_size))
+            
+            # Update background
+            box_style = self.subtitle_box_style.get()
+            box_color = self.subtitle_box_color.get()
+            
+            if box_style == "none":
+                preview_canvas.itemconfig(preview_bg_id, state="hidden")
+            else:
+                # Get text bounds
+                bbox = preview_canvas.bbox(preview_text_id)
+                if bbox:
+                    # Add padding
+                    padding = 10
+                    x1, y1, x2, y2 = bbox
+                    x1 -= padding
+                    y1 -= padding
+                    x2 += padding
+                    y2 += padding
+                    
+                    preview_canvas.coords(preview_bg_id, x1, y1, x2, y2)
+                    preview_canvas.itemconfig(preview_bg_id, fill=box_color, state="normal")
+                    
+                    # For outline style, use outline instead of fill
+                    if box_style == "outline":
+                        preview_canvas.itemconfig(preview_bg_id, fill="", outline=box_color, width=2)
+                    else:
+                        preview_canvas.itemconfig(preview_bg_id, fill=box_color, outline="")
+        
+        # Track changes to update preview
+        self.subtitle_text_color.trace_add("write", update_preview)
+        self.subtitle_box_style.trace_add("write", update_preview)
+        self.subtitle_box_color.trace_add("write", update_preview)
+        self.subtitle_font_size.trace_add("write", update_preview)
+        
+        # Initial preview update
+        update_preview()
+        
+        # Buttons
+        button_frame = ttk.Frame(main_frame)
+        button_frame.pack(fill=tk.X, pady=(20, 0))
+        
+        def apply_style():
+            # Disable preset when using custom style
+            self.subtitle_preset.set("")
+            
+            # Update main window preview
+            self.style_preview_label.config(text=f"👉 Tùy chỉnh: Chữ {self.subtitle_text_color.get()}, kiểu {self.subtitle_box_style.get()}")
+            
+            dialog.destroy()
+        
+        ttk.Button(button_frame, text="Áp dụng", command=apply_style).pack(side=tk.LEFT)
+        ttk.Button(button_frame, text="Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
+
+    def get_subtitle_style(self):
+        """Lấy cấu hình kiểu phụ đề hiện tại"""
+        preset = self.subtitle_preset.get()
+        if preset:
+            # Dùng preset có sẵn
+            return {"preset": preset}
+        else:
+            # Dùng kiểu tùy chỉnh
+            return {
+                "text_color": self.subtitle_text_color.get(),
+                "box_style": self.subtitle_box_style.get(),
+                "box_color": self.subtitle_box_color.get(),
+                "font_size": self.subtitle_font_size.get()
+            }
+
     def start_processing(self):
-        """Bắt đầu xử lý video"""
+        """Bắt đầu xử lý video - Cập nhật với tùy chọn phụ đề"""
         if self.processing:
             messagebox.showwarning("Cảnh báo", "Đã có quá trình xử lý đang chạy!")
             return
@@ -340,17 +595,20 @@ class VideoEditorMainWindow:
             messagebox.showerror("Lỗi", "Vui lòng chọn vị trí lưu video đầu ra!")
             return
         
+        # Lấy cấu hình phụ đề
+        subtitle_style = self.get_subtitle_style()
+        
         # Start processing
         self.processing = True
         self.progress_bar.start()
         self.process_button.config(state="disabled")
         
-        thread = threading.Thread(target=self.process_video_thread)
+        thread = threading.Thread(target=lambda: self.process_video_thread(subtitle_style))
         thread.daemon = True
         thread.start()
-        
-    def process_video_thread(self):
-        """Thread xử lý video"""
+
+    def process_video_thread(self, subtitle_style=None):
+        """Thread xử lý video với tùy chọn phụ đề"""
         try:
             self.update_status("Đang xử lý video...")
             self.log_message("🚀 Bắt đầu xử lý video với overlay...")
@@ -361,7 +619,8 @@ class VideoEditorMainWindow:
             # Prepare parameters
             img_folder = self.img_folder_path.get() if self.img_folder_path.get() else None
             overlay_times = self.overlay_times if self.overlay_times else None
-              # Process video
+            
+            # Process video
             editor.process_video(
                 input_video_path=self.input_video_path.get(),
                 output_video_path=self.output_video_path.get(),
@@ -371,12 +630,13 @@ class VideoEditorMainWindow:
                 overlay_times=overlay_times,
                 video_overlay_settings=getattr(self, 'video_overlay_settings', None),
                 custom_timeline=self.custom_timeline_var.get(),
-                words_per_line=self.words_per_line.get()
+                words_per_line=self.words_per_line.get(),
+                subtitle_style=subtitle_style
             )
             
             self.update_status("✅ Xử lý hoàn thành!")
             self.log_message("🎉 Xử lý video thành công!")
-            messagebox.showinfo("Thành công", f"Video đã được lưu tại:\\n{self.output_video_path.get()}")
+            messagebox.showinfo("Thành công", f"Video đã được lưu tại:\n{self.output_video_path.get()}")
             
         except Exception as e:
             error_msg = f"Lỗi xử lý video: {str(e)}"
@@ -388,6 +648,8 @@ class VideoEditorMainWindow:
             self.processing = False
             self.progress_bar.stop()
             self.process_button.config(state="normal")
+        
+    
             
     def open_batch_processing(self):
         """Mở cửa sổ batch processing"""

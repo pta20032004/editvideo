@@ -380,106 +380,7 @@ def add_image_overlay(main_video_path, image_path, output_path,
     except Exception as e:
         raise Exception(f"Không thể chèn ảnh overlay: {str(e)}")
 
-def add_multiple_overlays(main_video_path, subtitle_path, output_path, overlay_folder, overlay_times):
-    """
-    Chèn nhiều video/ảnh overlay cùng lúc
-    """
-    try:
-        ffmpeg_path = find_ffmpeg()
-        
-        # Tìm tất cả file media
-        media_files = []
-        for ext in ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.bmp', '*.mp4', '*.avi', '*.mov', '*.mkv', '*.wmv']:
-            media_files.extend(glob.glob(os.path.join(overlay_folder, ext)))
-        
-        if not media_files:
-            print("⚠️ Không tìm thấy file overlay nào")
-            return False
-        
-        # Chuẩn bị inputs
-        inputs = ['-i', main_video_path]
-        overlay_configs = []
-        
-        for media_file in media_files:
-            filename = os.path.basename(media_file)
-            if filename in overlay_times:
-                inputs.extend(['-i', media_file])
-                overlay_configs.append({
-                    'file': media_file,
-                    'filename': filename,
-                    'start': overlay_times[filename]['start'],
-                    'duration': overlay_times[filename]['duration'],
-                    'is_video': media_file.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.wmv'))
-                })
-        
-        if not overlay_configs:
-            print("⚠️ Không có file overlay nào được cấu hình thời gian")
-            return False
-        
-        # Tạo filter complex
-        filter_parts = []
-        
-        # Bước 1: Thêm subtitles
-        subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
-        subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=8,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=1,Shadow=1,MarginV=50'[sub]"
-        filter_parts.append(subtitle_filter)
-        
-        # Bước 2: Xử lý overlay
-        current_input = "sub"
-        for i, config in enumerate(overlay_configs):
-            input_index = i + 1
-            
-            if config['is_video']:
-                # Video overlay với chroma key
-                scale_filter = f"[{input_index}:v]scale=-1:ih*0.3[scaled{i}]"
-                filter_parts.append(scale_filter)
-                
-                chromakey_filter = f"[scaled{i}]chromakey=0x00ff00:0.1:0.1[chroma{i}]"
-                filter_parts.append(chromakey_filter)
-                
-                end_time = config['start'] + config['duration']
-                overlay_filter = f"[{current_input}][chroma{i}]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:enable='between(t,{config['start']},{end_time})'"
-            else:
-                # Ảnh overlay
-                scale_filter = f"[{input_index}]scale=iw*0.1:ih*0.1[img{i}]"
-                filter_parts.append(scale_filter)
-                
-                end_time = config['start'] + config['duration']
-                overlay_filter = f"[{current_input}][img{i}]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:enable='between(t,{config['start']},{end_time})'"
-            
-            if i < len(overlay_configs) - 1:
-                overlay_filter += f"[tmp{i}]"
-                current_input = f"tmp{i}"
-            
-            filter_parts.append(overlay_filter)
-        
-        filter_complex = ";".join(filter_parts)
-        
-        cmd = [
-            ffmpeg_path,
-            *inputs,
-            '-filter_complex', filter_complex,
-            '-c:a', 'copy',
-            '-y',
-            output_path
-        ]
-        
-        print(f"🎭 Đang chèn {len(overlay_configs)} overlay...")
-        for config in overlay_configs:
-            media_type = "Video" if config['is_video'] else "Ảnh"
-            print(f"  {media_type}: {config['filename']} ({config['start']}s, {config['duration']}s)")
-        
-        result = subprocess.run(cmd, capture_output=True, text=True)
-        
-        if result.returncode != 0:
-            raise Exception(f"Lỗi chèn multiple overlay: {result.stderr}")
-        
-        print(f"✅ Chèn multiple overlay thành công!")
-        return True
-        
-    except Exception as e:
-        print(f"❌ Lỗi: {str(e)}")
-        return False
+
 
 def find_ffmpeg():
     """Tìm đường dẫn FFmpeg"""
@@ -696,10 +597,149 @@ def _create_animation_filter(animation, start_time, duration, animation_duration
         # Mặc định: fade_in
         return f"[scaled]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1[animated]"
 
+def _create_animation_filter_for_multiple(animation, start_time, duration, animation_duration, input_label, output_label):
+    """Tạo animation filter cho multiple overlay"""
+    
+    fade_start = start_time
+    fade_end = start_time + animation_duration
+    fade_out_start = start_time + duration - animation_duration
+    
+    if animation == "fade_in":
+        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1[{output_label}]"
+    
+    elif animation == "fade_out":
+        return f"[{input_label}]fade=t=out:st={fade_out_start}:d={animation_duration}:alpha=1[{output_label}]"
+    
+    elif animation == "fade_in_out":
+        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1,fade=t=out:st={fade_out_start}:d={animation_duration}:alpha=1[{output_label}]"
+    
+    elif animation == "zoom_in":
+        zoom_factor = f"if(lt(t,{fade_end}),0.3+0.7*(t-{fade_start})/{animation_duration},1)"
+        return f"[{input_label}]scale=iw*{zoom_factor}:ih*{zoom_factor}[{output_label}]"
+    
+    elif animation == "pulse":
+        pulse_scale = f"1+0.3*sin(6*PI*(t-{fade_start})/2)"
+        return f"[{input_label}]scale=iw*{pulse_scale}:ih*{pulse_scale}[{output_label}]"
+    
+    else:
+        # Mặc định
+        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1[{output_label}]"
+
+
+def add_multiple_overlays(main_video_path, subtitle_path, output_path, overlay_folder, overlay_times):
+    """
+    Chèn nhiều video/ảnh overlay cùng lúc - ĐÃ SỬA STYLES
+    """
+    try:
+        ffmpeg_path = find_ffmpeg()
+        
+        # Tìm tất cả file media
+        media_files = []
+        for ext in ['*.png', '*.jpg', '*.jpeg', '*.gif', '*.bmp', '*.mp4', '*.avi', '*.mov', '*.mkv', '*.wmv']:
+            media_files.extend(glob.glob(os.path.join(overlay_folder, ext)))
+        
+        if not media_files:
+            print("⚠️ Không tìm thấy file overlay nào")
+            return False
+        
+        # Chuẩn bị inputs
+        inputs = ['-i', main_video_path]
+        overlay_configs = []
+        
+        for media_file in media_files:
+            filename = os.path.basename(media_file)
+            if filename in overlay_times:
+                inputs.extend(['-i', media_file])
+                overlay_configs.append({
+                    'file': media_file,
+                    'filename': filename,
+                    'start': overlay_times[filename]['start'],
+                    'duration': overlay_times[filename]['duration'],
+                    'is_video': media_file.lower().endswith(('.mp4', '.avi', '.mov', '.mkv', '.wmv'))
+                })
+        
+        if not overlay_configs:
+            print("⚠️ Không có file overlay nào được cấu hình thời gian")
+            return False
+        
+        # Tạo filter complex
+        filter_parts = []
+        
+        # Bước 1: Thêm subtitles - ĐÃ SỬA
+        subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
+        
+        # SỬA: Sử dụng style system thay vì hardcode
+        from subtitle_styles import get_preset_style
+        style_string = get_preset_style("default")
+        
+        # BEFORE: 
+        # subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=8,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=1,Shadow=1,MarginV=50'[sub]"
+        
+        # AFTER:
+        subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='{style_string}'[sub]"
+        filter_parts.append(subtitle_filter)
+        
+        # Bước 2: Xử lý overlay
+        current_input = "sub"
+        for i, config in enumerate(overlay_configs):
+            input_index = i + 1
+            
+            if config['is_video']:
+                # Video overlay với chroma key
+                scale_filter = f"[{input_index}:v]scale=-1:ih*0.3[scaled{i}]"
+                filter_parts.append(scale_filter)
+                
+                chromakey_filter = f"[scaled{i}]chromakey=0x00ff00:0.1:0.1[chroma{i}]"
+                filter_parts.append(chromakey_filter)
+                
+                end_time = config['start'] + config['duration']
+                overlay_filter = f"[{current_input}][chroma{i}]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:enable='between(t,{config['start']},{end_time})'"
+            else:
+                # Ảnh overlay
+                scale_filter = f"[{input_index}]scale=iw*0.1:ih*0.1[img{i}]"
+                filter_parts.append(scale_filter)
+                
+                end_time = config['start'] + config['duration']
+                overlay_filter = f"[{current_input}][img{i}]overlay=(main_w-overlay_w)/2:(main_h-overlay_h)/2:enable='between(t,{config['start']},{end_time})'"
+            
+            if i < len(overlay_configs) - 1:
+                overlay_filter += f"[tmp{i}]"
+                current_input = f"tmp{i}"
+            
+            filter_parts.append(overlay_filter)
+        
+        filter_complex = ";".join(filter_parts)
+        
+        cmd = [
+            ffmpeg_path,
+            *inputs,
+            '-filter_complex', filter_complex,
+            '-c:a', 'copy',
+            '-y',
+            output_path
+        ]
+        
+        print(f"🎭 Đang chèn {len(overlay_configs)} overlay...")
+        for config in overlay_configs:
+            media_type = "Video" if config['is_video'] else "Ảnh"
+            print(f"  {media_type}: {config['filename']} ({config['start']}s, {config['duration']}s)")
+        
+        result = subprocess.run(cmd, capture_output=True, text=True)
+        
+        if result.returncode != 0:
+            raise Exception(f"Lỗi chèn multiple overlay: {result.stderr}")
+        
+        print(f"✅ Chèn multiple overlay thành công!")
+        return True
+        
+    except Exception as e:
+        print(f"❌ Lỗi: {str(e)}")
+        return False
+
 def add_multiple_images_with_animations(main_video_path, subtitle_path, output_path, 
                                        img_folder, overlay_times, animations=None):
     """
-    Chèn nhiều ảnh với animation khác nhau
+    Chèn nhiều ảnh với animation khác nhau - ĐÃ SỬA STYLES
     
     Args:
         animations (dict): {filename: {'type': 'fade_in', 'duration': 1.0}}
@@ -746,9 +786,24 @@ def add_multiple_images_with_animations(main_video_path, subtitle_path, output_p
         # Tạo filter complex với animations
         filter_parts = []
         
-        # Subtitle filter
+        # Subtitle filter - ĐÃ SỬA
         subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
-        subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=12,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1,MarginV=50'[sub]"
+        
+        # SỬA: Sử dụng style system với font size lớn hơn cho animations
+        from subtitle_styles import get_subtitle_style_string
+        style_string = get_subtitle_style_string(
+            text_color="black",      # Sử dụng màu mới
+            box_style="box",         # Sử dụng box thay vì outline
+            box_color="white",       # Nền trắng
+            font_size=12,            # Font size lớn hơn một chút cho animation
+            margin_v=50
+        )
+        
+        # BEFORE:
+        # subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=12,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1,MarginV=50'[sub]"
+        
+        # AFTER:
+        subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='{style_string}'[sub]"
         filter_parts.append(subtitle_filter)
         
         # Xử lý từng ảnh
@@ -818,41 +873,14 @@ def add_multiple_images_with_animations(main_video_path, subtitle_path, output_p
         print(f"❌ Lỗi: {str(e)}")
         return False
 
-def _create_animation_filter_for_multiple(animation, start_time, duration, animation_duration, input_label, output_label):
-    """Tạo animation filter cho multiple overlay"""
-    
-    fade_start = start_time
-    fade_end = start_time + animation_duration
-    fade_out_start = start_time + duration - animation_duration
-    
-    if animation == "fade_in":
-        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1[{output_label}]"
-    
-    elif animation == "fade_out":
-        return f"[{input_label}]fade=t=out:st={fade_out_start}:d={animation_duration}:alpha=1[{output_label}]"
-    
-    elif animation == "fade_in_out":
-        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1,fade=t=out:st={fade_out_start}:d={animation_duration}:alpha=1[{output_label}]"
-    
-    elif animation == "zoom_in":
-        zoom_factor = f"if(lt(t,{fade_end}),0.3+0.7*(t-{fade_start})/{animation_duration},1)"
-        return f"[{input_label}]scale=iw*{zoom_factor}:ih*{zoom_factor}[{output_label}]"
-    
-    elif animation == "pulse":
-        pulse_scale = f"1+0.3*sin(6*PI*(t-{fade_start})/2)"
-        return f"[{input_label}]scale=iw*{pulse_scale}:ih*{pulse_scale}[{output_label}]"
-    
-    else:
-        # Mặc định
-        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1[{output_label}]"
-
 def add_images_with_custom_timeline(main_video_path, subtitle_path, output_path, img_folder):
     """
-    Thêm 3 ảnh với timeline và vị trí tùy chỉnh theo yêu cầu của bạn
+    Thêm 3 ảnh với timeline và vị trí tùy chỉnh theo yêu cầu của bạn - ĐÃ SỬA STYLES
     """
     try:
         ffmpeg_path = find_ffmpeg()
-          # Cấu hình ảnh theo yêu cầu mới
+        
+        # Cấu hình ảnh theo yêu cầu mới
         image_configs = [
             {
                 "image": "1.png",  # Ảnh 1
@@ -881,15 +909,31 @@ def add_images_with_custom_timeline(main_video_path, subtitle_path, output_path,
         inputs = ['-i', main_video_path]
         filter_parts = []
         
-        # Thêm subtitle trước
+        # Thêm subtitle trước - ĐÃ SỬA
         if subtitle_path and os.path.exists(subtitle_path):
             subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
-            subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=12,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1,MarginV=50'[sub]"
+            
+            # SỬA: Sử dụng style system
+            from subtitle_styles import get_subtitle_style_string
+            style_string = get_subtitle_style_string(
+                text_color="black",      # Màu mới
+                box_style="box",         # Box thay vì outline
+                box_color="white",       # Nền trắng
+                font_size=12,            # Font size phù hợp
+                margin_v=50
+            )
+            
+            # BEFORE: 
+            # subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='FontName=Arial,FontSize=12,PrimaryColour=&Hffffff,OutlineColour=&H000000,Outline=2,Shadow=1,MarginV=50'[sub]"
+            
+            # AFTER:
+            subtitle_filter = f"[0:v]subtitles='{subtitle_path_escaped}':force_style='{style_string}'[sub]"
             filter_parts.append(subtitle_filter)
             current_input = "sub"
         else:
             current_input = "0:v"
-          # Xử lý từng ảnh
+        
+        # Xử lý từng ảnh
         valid_configs = []
         for i, config in enumerate(image_configs):
             img_path = os.path.join(img_folder, config["image"])
@@ -940,7 +984,8 @@ def add_images_with_custom_timeline(main_video_path, subtitle_path, output_path,
                 current_input = f"tmp{i}"
             
             filter_parts.append(overlay_filter)
-          # Tạo command FFmpeg
+        
+        # Tạo command FFmpeg
         filter_complex = ";".join(filter_parts)
         
         print(f"🔍 Debug Filter Complex:")
@@ -974,6 +1019,34 @@ def add_images_with_custom_timeline(main_video_path, subtitle_path, output_path,
     except Exception as e:
         print(f"❌ Lỗi: {str(e)}")
         return False
+
+def _create_animation_filter_for_multiple(animation, start_time, duration, animation_duration, input_label, output_label):
+    """Tạo animation filter cho multiple overlay"""
+    
+    fade_start = start_time
+    fade_end = start_time + animation_duration
+    fade_out_start = start_time + duration - animation_duration
+    
+    if animation == "fade_in":
+        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1[{output_label}]"
+    
+    elif animation == "fade_out":
+        return f"[{input_label}]fade=t=out:st={fade_out_start}:d={animation_duration}:alpha=1[{output_label}]"
+    
+    elif animation == "fade_in_out":
+        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1,fade=t=out:st={fade_out_start}:d={animation_duration}:alpha=1[{output_label}]"
+    
+    elif animation == "zoom_in":
+        zoom_factor = f"if(lt(t,{fade_end}),0.3+0.7*(t-{fade_start})/{animation_duration},1)"
+        return f"[{input_label}]scale=iw*{zoom_factor}:ih*{zoom_factor}[{output_label}]"
+    
+    elif animation == "pulse":
+        pulse_scale = f"1+0.3*sin(6*PI*(t-{fade_start})/2)"
+        return f"[{input_label}]scale=iw*{pulse_scale}:ih*{pulse_scale}[{output_label}]"
+    
+    else:
+        # Mặc định
+        return f"[{input_label}]fade=t=in:st={fade_start}:d={animation_duration}:alpha=1[{output_label}]"
 
 if __name__ == "__main__":
     # Test function
