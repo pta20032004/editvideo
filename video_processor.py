@@ -2,6 +2,7 @@ import os
 import subprocess
 import shutil
 import traceback
+from subtitle_config import SubtitleConfig, get_legacy_subtitle_style
 
 class VideoProcessor:
     def __init__(self):
@@ -549,42 +550,29 @@ class VideoProcessor:
  
     def _add_subtitle_only(self, video_path, subtitle_path, output_path, subtitle_style=None):
         """
-        Chỉ ghép phụ đề vào video (không có overlay)
-        
-        Args:
-            video_path (str): Đường dẫn video
-            subtitle_path (str): Đường dẫn phụ đề
-            output_path (str): Đường dẫn kết quả
-            subtitle_style (dict): Kiểu phụ đề
+        Chỉ ghép phụ đề vào video với hỗ trợ subtitle config mới
         """
         try:
-            from subtitle_styles import get_subtitle_style_string, get_preset_style
-            
             # Chuẩn bị subtitle path
             subtitle_path_escaped = subtitle_path.replace('\\', '/').replace(':', '\\:')
             
-            # Xác định style - ĐÃ CẬP NHẬT MẶC ĐỊNH
+            # ✅ SỬA: Sử dụng SubtitleConfig system
             if subtitle_style is None:
-                subtitle_style = {
-                    "text_color": "black",
-                    "box_style": "box",
-                    "box_color": "white", 
-                    "font_size": 10
-                }
-                
-            # Sử dụng preset hoặc tạo style tùy chỉnh
-            if "preset" in subtitle_style and subtitle_style["preset"]:
-                style_string = get_preset_style(subtitle_style["preset"])
+                # Default config
+                subtitle_config = SubtitleConfig()
+            elif isinstance(subtitle_style, dict):
+                # Legacy format hoặc config dict
+                subtitle_config = SubtitleConfig()
+                subtitle_config.from_dict(subtitle_style)
             else:
-                style_string = get_subtitle_style_string(
-                    text_color=subtitle_style.get("text_color", "black"),     # ĐÃ ĐỔI
-                    box_style=subtitle_style.get("box_style", "box"),         # ĐÃ ĐỔI
-                    box_color=subtitle_style.get("box_color", "white"),       # ĐÃ ĐỔI
-                    font_name=subtitle_style.get("font_name", "Arial"),
-                    font_size=subtitle_style.get("font_size", 10),            # ĐÃ ĐỔI
-                    margin_v=subtitle_style.get("margin_v", 50),
-                    opacity=subtitle_style.get("opacity", 255)
-                )
+                # Assume it's already a SubtitleConfig object
+                subtitle_config = subtitle_style
+            
+            # Detect language từ subtitle content để auto-adjust
+            detected_language = self._detect_subtitle_language(subtitle_path)
+            
+            # Tạo style string với language support
+            style_string = subtitle_config.get_full_style_string(detected_language)
             
             # Tạo filter subtitle
             font_path = self._get_font_path()
@@ -606,6 +594,7 @@ class VideoProcessor:
             print(f"🎞️ Đang ghép phụ đề...")
             print(f"📂 Video: {video_path}")
             print(f"📝 Subtitle: {subtitle_path}")
+            print(f"🌐 Language: {detected_language}")
             print(f"🎨 Style: {style_string}")
             print(f"💾 Output: {output_path}")
             
@@ -618,6 +607,44 @@ class VideoProcessor:
             
         except Exception as e:
             raise Exception(f"Không thể ghép phụ đề: {str(e)}")
+
+    def _detect_subtitle_language(self, subtitle_path):
+        """
+        Detect ngôn ngữ từ nội dung subtitle để auto-adjust
+        """
+        try:
+            with open(subtitle_path, 'r', encoding='utf-8') as f:
+                content = f.read()
+            
+            # Simple detection based on character patterns
+            import re
+            
+            # Count different character types
+            chinese_chars = len(re.findall(r'[\u4e00-\u9fff]', content))
+            japanese_chars = len(re.findall(r'[\u3040-\u309f\u30a0-\u30ff]', content))
+            korean_chars = len(re.findall(r'[\uac00-\ud7af]', content))
+            latin_chars = len(re.findall(r'[a-zA-Z]', content))
+            vietnamese_chars = len(re.findall(r'[àáạảãâầấậẩẫăằắặẳẵèéẹẻẽêềếệểễìíịỉĩòóọỏõôồốộổỗơờớợởỡùúụủũưừứựửữỳýỵỷỹđ]', content))
+            
+            total_chars = chinese_chars + japanese_chars + korean_chars + latin_chars + vietnamese_chars
+            
+            if total_chars == 0:
+                return 'en'  # Default
+            
+            # Determine language based on character distribution
+            if chinese_chars / total_chars > 0.3:
+                return 'zh'
+            elif japanese_chars / total_chars > 0.1:
+                return 'ja'
+            elif korean_chars / total_chars > 0.3:
+                return 'ko'
+            elif vietnamese_chars / total_chars > 0.1:
+                return 'vi'
+            else:
+                return 'en'  # Default to English
+                
+        except Exception:
+            return 'en'  # Default if detection fails
 
     def _add_subtitle_and_media_overlay(self, video_path, subtitle_path, output_path, img_folder, overlay_times, subtitle_style=None):
         """

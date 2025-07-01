@@ -29,24 +29,28 @@ class SubtitleGenerator:
         self.recognizer = None
         self.whisper_model = None
         
-        # Ưu tiên sử dụng Whisper nếu có
+        # ✅ THÊM: Hỗ trợ tiếng Trung tốt hơn
+        self.language_codes = {
+            'vi': 'vietnamese',
+            'en': 'english', 
+            'zh': 'chinese',        # ✅ THÊM
+            'zh-cn': 'chinese',     # ✅ THÊM: Simplified Chinese
+            'zh-tw': 'chinese',     # ✅ THÊM: Traditional Chinese
+            'ja': 'japanese',
+            'ko': 'korean',
+            'es': 'spanish',
+            'fr': 'french',
+            'de': 'german'
+        }
+        
         if HAS_WHISPER:
             print("🤖 Sử dụng OpenAI Whisper để tạo phụ đề")
             try:
-                self.whisper_model = whisper.load_model("base")
+                # ✅ SỬA: Sử dụng model lớn hơn cho tiếng Trung
+                self.whisper_model = whisper.load_model("base")  # Có thể đổi thành "small" hoặc "medium"
             except Exception as e:
                 print(f"⚠️ Không thể tải Whisper model: {e}")
                 self.whisper_model = None
-        
-        if HAS_SPEECH_RECOGNITION and not self.whisper_model:
-            print("🎙️ Sử dụng SpeechRecognition để tạo phụ đề")
-            self.recognizer = sr.Recognizer()
-        
-        if not HAS_WHISPER and not HAS_SPEECH_RECOGNITION:
-            raise ImportError(
-                "Cần cài đặt ít nhất một trong các thư viện: "
-                "openai-whisper hoặc SpeechRecognition"
-            )
     
     def generate_subtitle(self, audio_path, subtitle_output_path, language='vi', words_per_line=7):
         """
@@ -63,41 +67,56 @@ class SubtitleGenerator:
             raise Exception("Không có engine nào để tạo phụ đề")
     
     def _generate_with_whisper(self, audio_path, subtitle_output_path, language, words_per_line=7):
-        """Tạo phụ đề sử dụng OpenAI Whisper"""
+        """Tạo phụ đề sử dụng OpenAI Whisper - CẬP NHẬT TIẾNG TRUNG"""
         try:
             print("🤖 Đang tạo phụ đề với Whisper...")
             
-            # Kiểm tra file audio có tồn tại và có nội dung không
             if not os.path.exists(audio_path):
                 raise Exception(f"File audio không tồn tại: {audio_path}")
             
-            # Kiểm tra kích thước file audio
             audio_size = os.path.getsize(audio_path)
-            if audio_size < 1024:  # File quá nhỏ (< 1KB)
+            if audio_size < 1024:
                 print("⚠️ File audio trống hoặc quá nhỏ, tạo phụ đề mặc định...")
                 self._create_default_subtitle(subtitle_output_path)
                 return
             
-            # Whisper xử lý trực tiếp file audio
-            result = self.whisper_model.transcribe(
-                audio_path, 
-                language=language if language != 'vi' else 'vietnamese'
-            )
+            # ✅ SỬA: Xử lý ngôn ngữ tiếng Trung đặc biệt
+            whisper_language = None
+            if language in self.language_codes:
+                whisper_language = self.language_codes[language]
+            elif language.startswith('zh'):  # zh, zh-cn, zh-tw
+                whisper_language = 'chinese'
+            else:
+                whisper_language = language  # Fallback
             
-            # Kiểm tra kết quả
+            print(f"🌐 Sử dụng Whisper language: {whisper_language} cho input: {language}")
+            
+            # ✅ THÊM: Tùy chọn đặc biệt cho tiếng Trung
+            transcribe_options = {
+                'language': whisper_language,
+                'task': 'transcribe',  # Không dịch, chỉ transcribe
+            }
+            
+            # ✅ THÊM: Thêm temperature cho tiếng Trung để cải thiện độ chính xác
+            if language.startswith('zh'):
+                transcribe_options['temperature'] = 0.0  # Deterministic cho tiếng Trung
+                transcribe_options['beam_size'] = 5      # Tăng beam size
+                
+            result = self.whisper_model.transcribe(audio_path, **transcribe_options)
+            
             if not result.get('segments') or len(result['segments']) == 0:
                 print("⚠️ Không phát hiện được giọng nói, tạo phụ đề mặc định...")
                 self._create_default_subtitle(subtitle_output_path)
                 return
             
-            # Chuyển đổi kết quả thành format SRT
-            srt_content = self._whisper_result_to_srt(result, words_per_line)
+            # ✅ SỬA: Chuyển đổi kết quả thành format SRT với xử lý tiếng Trung
+            srt_content = self._whisper_result_to_srt(result, words_per_line, language)
             
-            # Lưu file SRT
-            with open(subtitle_output_path, 'w', encoding='utf-8') as f:
+            # ✅ THÊM: Đảm bảo encoding UTF-8 cho tiếng Trung
+            with open(subtitle_output_path, 'w', encoding='utf-8', errors='ignore') as f:
                 f.write(srt_content)
             
-            print(f"✅ Tạo phụ đề thành công với {len(result['segments'])} đoạn")
+            print(f"✅ Tạo phụ đề {language} thành công với {len(result['segments'])} đoạn")
             
         except Exception as e:
             print(f"⚠️ Lỗi tạo phụ đề với Whisper: {str(e)}, tạo phụ đề mặc định...")
@@ -122,8 +141,8 @@ class SubtitleGenerator:
         
         print(f"✅ Tạo phụ đề mặc định: {subtitle_output_path}")
     
-    def _whisper_result_to_srt(self, result, words_per_line=7):
-        """Chuyển đổi kết quả Whisper thành format SRT với giới hạn từ mỗi dòng"""
+    def _whisper_result_to_srt(self, result, words_per_line=7, language='vi'):
+        """Chuyển đổi kết quả Whisper thành format SRT - CẬP NHẬT TIẾNG TRUNG"""
         srt_content = ""
         subtitle_index = 1
         
@@ -132,8 +151,11 @@ class SubtitleGenerator:
             end_time = segment['end']
             text = segment['text'].strip()
             
-            # Chia text thành các dòng ngắn với số từ tùy chỉnh
-            lines = self._split_text_into_lines(text, max_words_per_line=words_per_line)
+            # ✅ THÊM: Xử lý đặc biệt cho tiếng Trung (không có khoảng trắng giữa từ)
+            if language.startswith('zh'):
+                lines = self._split_chinese_text_into_lines(text, max_chars_per_line=words_per_line*2)
+            else:
+                lines = self._split_text_into_lines(text, max_words_per_line=words_per_line)
             
             if not lines:
                 continue
@@ -156,7 +178,7 @@ class SubtitleGenerator:
                 subtitle_index += 1
         
         return srt_content
-    
+
     def _generate_with_speech_recognition(self, audio_path, subtitle_output_path, language, words_per_line=7):
         """Tạo phụ đề sử dụng SpeechRecognition (phương pháp dự phòng)"""
         try:
@@ -277,6 +299,40 @@ class SubtitleGenerator:
         
         return lines
     
+    def _split_chinese_text_into_lines(self, text, max_chars_per_line=14):
+        """Chia text tiếng Trung thành các dòng ngắn theo số ký tự"""
+        import re
+        
+        text = text.strip()
+        if not text:
+            return []
+        
+        # Chia theo dấu câu tiếng Trung
+        sentences = re.split(r'[。！？；，]', text)
+        lines = []
+        
+        for sentence in sentences:
+            sentence = sentence.strip()
+            if not sentence:
+                continue
+                
+            # Nếu câu quá dài, chia nhỏ theo số ký tự
+            while len(sentence) > max_chars_per_line:
+                # Tìm vị trí chia tốt nhất (ưu tiên sau dấu phẩy hoặc khoảng trắng)
+                split_pos = max_chars_per_line
+                for i in range(max_chars_per_line-1, max_chars_per_line//2, -1):
+                    if i < len(sentence) and sentence[i] in '，、 ':
+                        split_pos = i + 1
+                        break
+                
+                lines.append(sentence[:split_pos].strip())
+                sentence = sentence[split_pos:].strip()
+            
+            if sentence:
+                lines.append(sentence)
+        
+        return lines
+
     def _optimize_subtitle_timing(self, lines, total_duration):
         """Tối ưu thời gian hiển thị cho từng dòng phụ đề"""
         if not lines:
