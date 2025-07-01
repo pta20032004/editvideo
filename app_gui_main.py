@@ -270,23 +270,28 @@ class VideoEditorGUI:
         update_style_preview()
 
     def configure_subtitle_style(self):
-        """Hiển thị dialog cấu hình kiểu phụ đề tùy chỉnh - ĐÃ SỬA PREVIEW"""
+        """Hiển thị dialog cấu hình kiểu phụ đề tùy chỉnh - ĐÃ SỬA UI VÀ PREVIEW"""
         dialog = tk.Toplevel(self.root)
         dialog.title("🎨 Tùy chỉnh kiểu phụ đề")
-        dialog.geometry("500x400")
+        dialog.geometry("600x500")  # Tăng kích thước
         dialog.transient(self.root)
         dialog.grab_set()
-        
+
+        # Main frame với scrollbar nếu cần
         main_frame = ttk.Frame(dialog, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
-        
+
         # Title
         ttk.Label(main_frame, text="🎨 Tùy chỉnh kiểu phụ đề", font=("Arial", 14, "bold")).pack(pady=(0, 20))
-        
+
+        # Controls frame
+        controls_frame = ttk.Frame(main_frame)
+        controls_frame.pack(fill=tk.X, pady=(0, 20))
+
         # Màu chữ
-        text_frame = ttk.Frame(main_frame)
+        text_frame = ttk.Frame(controls_frame)
         text_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(text_frame, text="Màu chữ:").pack(side=tk.LEFT)
+        ttk.Label(text_frame, text="Màu chữ:", width=12).pack(side=tk.LEFT)
         text_colors = ["black", "white", "yellow", "red", "green", "blue", "cyan", "magenta", "orange", "purple", "pink"]
         text_color_combo = ttk.Combobox(
             text_frame,
@@ -296,11 +301,11 @@ class VideoEditorGUI:
             width=12
         )
         text_color_combo.pack(side=tk.LEFT, padx=(10, 0))
-        
+
         # Kiểu nền
-        box_frame = ttk.Frame(main_frame)
+        box_frame = ttk.Frame(controls_frame)
         box_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(box_frame, text="Kiểu nền:").pack(side=tk.LEFT)
+        ttk.Label(box_frame, text="Kiểu nền:", width=12).pack(side=tk.LEFT)
         box_styles = ["none", "outline", "box", "rounded_box", "shadow_box"]
         box_style_combo = ttk.Combobox(
             box_frame,
@@ -310,11 +315,11 @@ class VideoEditorGUI:
             width=12
         )
         box_style_combo.pack(side=tk.LEFT, padx=(10, 0))
-        
+
         # Màu nền
-        box_color_frame = ttk.Frame(main_frame)
+        box_color_frame = ttk.Frame(controls_frame)
         box_color_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(box_color_frame, text="Màu nền:").pack(side=tk.LEFT)
+        ttk.Label(box_color_frame, text="Màu nền:", width=12).pack(side=tk.LEFT)
         box_colors = ["black", "white", "yellow", "red", "green", "blue", "cyan", "magenta", "orange", "purple", "pink"]
         box_color_combo = ttk.Combobox(
             box_color_frame,
@@ -324,80 +329,120 @@ class VideoEditorGUI:
             width=12
         )
         box_color_combo.pack(side=tk.LEFT, padx=(10, 0))
-        
+
         # Cỡ chữ
-        font_frame = ttk.Frame(main_frame)
+        font_frame = ttk.Frame(controls_frame)
         font_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(font_frame, text="Cỡ chữ:").pack(side=tk.LEFT)
+        ttk.Label(font_frame, text="Cỡ chữ:", width=12).pack(side=tk.LEFT)
         font_size_spinbox = ttk.Spinbox(
             font_frame,
             from_=6, to=24, increment=1,
             textvariable=self.subtitle_font_size,
-            width=5
+            width=8
         )
         font_size_spinbox.pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Preview - ĐÃ SỬA: GIỐNG NHU BAN ĐẦU
-        preview_frame = ttk.LabelFrame(main_frame, text="Xem trước", padding="10")
+
+        # Preview - ĐÃ SỬA: HIỂN THỊ NỀN ĐÚNG
+        preview_frame = ttk.LabelFrame(main_frame, text="Xem trước", padding="15")
         preview_frame.pack(fill=tk.X, pady=(20, 10))
-        
-        preview_canvas = tk.Canvas(preview_frame, width=400, height=100, bg="black")  # Nền đen
+
+        preview_canvas = tk.Canvas(preview_frame, width=500, height=120, bg="gray20")  # Nền xám đậm để thấy rõ
         preview_canvas.pack()
-        
+
+        # Text và background
         preview_text_id = preview_canvas.create_text(
-            200, 50, 
-            text="Đây là mẫu phụ đề", 
-            fill="white",  # ĐÃ SỬA: Chữ trắng như ban đầu
-            font=("Arial", 18)  # ĐÃ SỬA: Font size 18 như ban đầu
+            250, 60,
+            text="Đây là mẫu phụ đề",
+            fill="black",  # Sẽ thay đổi theo setting
+            font=("Arial", 12),  # Sẽ thay đổi theo setting
+            anchor="center"
         )
-        
-        # Preview background - ĐÃ SỬA: ẨN ĐI
+
+        # Background rectangle
         preview_bg_id = preview_canvas.create_rectangle(
             0, 0, 0, 0,
-            fill="black", outline="", state="hidden"  # ĐÃ SỬA: hidden như ban đầu
+            fill="white", outline="", state="normal"  # Sẽ thay đổi theo setting
         )
-        
+
         # Move background behind text
         preview_canvas.tag_lower(preview_bg_id, preview_text_id)
-        
-        # Update preview function - ĐÃ SỬA: KHÔNG ĐỔI MÀU, KHÔNG CÓ NỀN
+
+        # Update preview function - ĐÃ SỬA: HIỂN THỊ ĐÚNG MÀU VÀ NỀN
         def update_preview(*args):
-            # Chỉ update font size, KHÔNG ĐỔI MÀU
+            # Update text color
+            text_color = self.subtitle_text_color.get()
+            # Convert color name to RGB for canvas (not BGR)
+            color_map = {
+                "black": "black", "white": "white", "yellow": "yellow",
+                "red": "red", "green": "green", "blue": "blue",
+                "cyan": "cyan", "magenta": "magenta", "orange": "orange",
+                "purple": "purple", "pink": "pink"
+            }
+            canvas_text_color = color_map.get(text_color, "black")
+            preview_canvas.itemconfig(preview_text_id, fill=canvas_text_color)
+
+            # Update font size
             font_size = self.subtitle_font_size.get()
             preview_canvas.itemconfig(preview_text_id, font=("Arial", font_size))
-            
-            # KHÔNG CÓ NỀN, KHÔNG ĐỔ BÓNG - giữ nguyên như ban đầu
-            preview_canvas.itemconfig(preview_bg_id, state="hidden")
-        
-        # Track changes to update preview - CHỈ THEO DÕI FONT SIZE
+
+            # Update background
+            box_style = self.subtitle_box_style.get()
+            box_color = self.subtitle_box_color.get()
+            canvas_box_color = color_map.get(box_color, "white")
+
+            if box_style in ["box", "rounded_box", "shadow_box"]:
+                # Hiển thị nền
+                bbox = preview_canvas.bbox(preview_text_id)
+                if bbox:
+                    padding = 15
+                    x1, y1, x2, y2 = bbox
+                    x1 -= padding
+                    y1 -= padding
+                    x2 += padding
+                    y2 += padding
+
+                    preview_canvas.coords(preview_bg_id, x1, y1, x2, y2)
+                    preview_canvas.itemconfig(preview_bg_id, fill=canvas_box_color, state="normal")
+            else:
+                # Ẩn nền
+                preview_canvas.itemconfig(preview_bg_id, state="hidden")
+
+        # Track changes để update preview
+        self.subtitle_text_color.trace_add("write", update_preview)
+        self.subtitle_box_style.trace_add("write", update_preview)
+        self.subtitle_box_color.trace_add("write", update_preview)
         self.subtitle_font_size.trace_add("write", update_preview)
-        
+
         # Initial preview update
         update_preview()
-        
-        # Buttons
+
+        # Buttons frame - ĐÃ SỬA: ĐỂ KHÔNG BỊ CHE
         button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(20, 0))
-        
+        button_frame.pack(fill=tk.X, pady=(30, 0))  # Tăng padding top
+
         def apply_style():
             # Disable preset when using custom style
             self.subtitle_preset.set("")
-            
+
             # Update main window preview
             self.style_preview_label.config(text=f"👉 Tùy chỉnh: Chữ {self.subtitle_text_color.get()}, nền {self.subtitle_box_color.get()}, cỡ {self.subtitle_font_size.get()}")
-            
+
             # Đóng dialog
             dialog.destroy()
-        
+
         apply_button = ttk.Button(
-            button_frame, 
-            text="✓ Áp dụng", 
-            command=apply_style,
-            style="Accent.TButton"
+            button_frame,
+            text="✓ Áp dụng",
+            command=apply_style
         )
         apply_button.pack(side=tk.LEFT, padx=(0, 10))
-        
-        ttk.Button(button_frame, text="Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
+
+        cancel_button = ttk.Button(
+            button_frame,
+            text="❌ Hủy",
+            command=dialog.destroy
+        )
+        cancel_button.pack(side=tk.RIGHT)
 
     def get_subtitle_style(self):
         """Lấy cấu hình kiểu phụ đề hiện tại"""
