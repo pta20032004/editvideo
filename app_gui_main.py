@@ -51,28 +51,27 @@ class VideoEditorGUI:
         
         # Thêm biến cho kiểu phụ đề
         self.subtitle_preset = tk.StringVar(value="default")
-        self.subtitle_text_color = tk.StringVar(value="black")      # ĐÃ ĐỔI: từ "white" thành "black"  
-        self.subtitle_box_style = tk.StringVar(value="box")         # ĐÃ ĐỔI: từ "outline" thành "box"
-        self.subtitle_box_color = tk.StringVar(value="white")       # ĐÃ ĐỔI: từ "black" thành "white"
-        self.subtitle_font_size = tk.IntVar(value=10)               # ĐÃ ĐỔI: từ 12 thành 10
+        self.subtitle_text_color = tk.StringVar(value="black")
+        self.subtitle_box_style = tk.StringVar(value="box")
+        self.subtitle_box_color = tk.StringVar(value="white")
+        self.subtitle_font_size = tk.IntVar(value=10)
         
-        # Overlay settings - KHÔI PHỤC LẠI SETTINGS GỐC CỦA BẠN
+        # Overlay settings - ĐÃ SỬA Y=1200
         self.overlay_times = {}
         self.animation_config = {}
         self.video_overlay_settings = {
-            'enabled': True,  # MẶC ĐỊNH BẬT
-            'chroma_color': 'green',  # MẶC ĐỊNH BLACK
+            'enabled': True,
+            'chroma_color': 'green',
             'chroma_similarity': 0.2,
             'chroma_blend': 0.2,
             
-            # KHÔI PHỤC LẠI SETTINGS GỐC CỦA BẠN
-            'position_mode': 'custom',    # Tùy chỉnh
-            'position': 'custom',         # Custom position
-            'custom_x': 300,              # X = 300
-            'custom_y': 1600,             # Y = 1600
+            'position_mode': 'custom',
+            'position': 'custom',
+            'custom_x': 300,
+            'custom_y': 1200,             # ĐÃ SỬA: từ 1600 thành 1200
             
-            'size_mode': 'percentage',    # Theo phần trăm
-            'size_percent': 50,           # 50% (không phải 25%)
+            'size_mode': 'percentage',
+            'size_percent': 50,
             
             'start_time': 5,
             'duration': 15,
@@ -82,7 +81,7 @@ class VideoEditorGUI:
         self.setup_ui()
         
     def setup_ui(self):
-        """Thiết lập giao diện người dùng - UPDATED"""
+        """Thiết lập giao diện người dùng - ĐÃ SỬA STATUS MESSAGE"""
         
         # Main frame
         main_frame = ttk.Frame(self.root, padding="10")
@@ -103,25 +102,24 @@ class VideoEditorGUI:
         
         row = 1
         
-        # Input folder selection - ĐỔI TỪ FILE SANG FOLDER
+        # Input folder selection
         ttk.Label(main_frame, text="📁 Thư mục video đầu vào:").grid(row=row, column=0, sticky=tk.W, pady=5)
         input_entry = ttk.Entry(main_frame, textvariable=self.input_folder_path)
         input_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(10, 5), pady=5)
         ttk.Button(main_frame, text="Chọn thư mục", command=self.select_input_folder).grid(row=row, column=2, padx=(5, 0), pady=5)
         row += 1
         
-        # Output folder selection - ĐỔI TỪ FILE SANG FOLDER
+        # Output folder selection
         ttk.Label(main_frame, text="💾 Thư mục đầu ra:").grid(row=row, column=0, sticky=tk.W, pady=5)
         output_entry = ttk.Entry(main_frame, textvariable=self.output_folder_path)
         output_entry.grid(row=row, column=1, sticky=(tk.W, tk.E), padx=(10, 5), pady=5)
         ttk.Button(main_frame, text="Chọn thư mục", command=self.select_output_folder).grid(row=row, column=2, padx=(5, 0), pady=5)
         row += 1
         
-        # Language and subtitle options - THÊM CHECKBOX PHỤ ĐỀ
+        # Language and subtitle options
         lang_frame = ttk.Frame(main_frame)
         lang_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
         
-        # THÊM CHECKBOX CHO PHỤ ĐỀ
         ttk.Checkbutton(
             lang_frame, 
             text="📝 Tạo phụ đề", 
@@ -179,8 +177,8 @@ class VideoEditorGUI:
         ttk.Button(overlay_frame, text="🎬 Cấu hình Video Overlay + Chroma Key", command=self.configure_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
         row += 1
         
-        # Status label - HIỂN THỊ MẶC ĐỊNH
-        self.video_overlay_status = ttk.Label(main_frame, text="✅ Sẵn sàng: Green chroma key (0.20, 0.20) | x=300, y=1600 | 50%", foreground="green")
+        # Status label - ĐÃ SỬA Y=1200
+        self.video_overlay_status = ttk.Label(main_frame, text="✅ Sẵn sàng: Green chroma key (0.20, 0.20) | x=300, y=1200 | 50%", foreground="green")
         self.video_overlay_status.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=2)
         row += 1
         
@@ -188,7 +186,7 @@ class VideoEditorGUI:
         self._create_subtitle_style_section(main_frame, row)
         row += 1
         
-        # Process button - CẬP NHẬT TEXT
+        # Process button
         self.process_button = ttk.Button(
             main_frame,
             text="🚀 Bắt đầu xử lý hàng loạt (Phụ đề + Video Overlay + 9:16)",
@@ -228,11 +226,10 @@ class VideoEditorGUI:
         # Configure row weight for log text
         main_frame.rowconfigure(row, weight=1)
         
-        # Initial log - CẬP NHẬT MESSAGE
+        # Initial log - ĐÃ SỬA MESSAGE Y=1200
         self.log_message("🎬 GUI Batch Video Processing đã sẵn sàng!")
         self.log_message("💡 Mặc định: Green chroma key, tạo phụ đề, video overlay enabled")
         self.log_message("📁 Hướng dẫn: Chọn thư mục input, output, sau đó bắt đầu xử lý")
-
 
     def _create_subtitle_style_section(self, parent, row):
         """Tạo phần cấu hình kiểu phụ đề - ĐÃ ĐƠN GIẢN HÓA"""
@@ -273,7 +270,7 @@ class VideoEditorGUI:
         update_style_preview()
 
     def configure_subtitle_style(self):
-        """Hiển thị dialog cấu hình kiểu phụ đề tùy chỉnh - ĐÃ CẬP NHẬT"""
+        """Hiển thị dialog cấu hình kiểu phụ đề tùy chỉnh - ĐÃ SỬA PREVIEW"""
         dialog = tk.Toplevel(self.root)
         dialog.title("🎨 Tùy chỉnh kiểu phụ đề")
         dialog.geometry("500x400")
@@ -328,82 +325,51 @@ class VideoEditorGUI:
         )
         box_color_combo.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Cỡ chữ - ĐÃ CẬP NHẬT RANGE
+        # Cỡ chữ
         font_frame = ttk.Frame(main_frame)
         font_frame.pack(fill=tk.X, pady=5)
         ttk.Label(font_frame, text="Cỡ chữ:").pack(side=tk.LEFT)
         font_size_spinbox = ttk.Spinbox(
             font_frame,
-            from_=6, to=24, increment=1,  # ĐÃ CẬP NHẬT: từ 8-36 thành 6-24
+            from_=6, to=24, increment=1,
             textvariable=self.subtitle_font_size,
             width=5
         )
         font_size_spinbox.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Preview
+        # Preview - ĐÃ SỬA: GIỐNG NHU BAN ĐẦU
         preview_frame = ttk.LabelFrame(main_frame, text="Xem trước", padding="10")
         preview_frame.pack(fill=tk.X, pady=(20, 10))
         
-        preview_canvas = tk.Canvas(preview_frame, width=400, height=100, bg="black")
+        preview_canvas = tk.Canvas(preview_frame, width=400, height=100, bg="black")  # Nền đen
         preview_canvas.pack()
         
         preview_text_id = preview_canvas.create_text(
             200, 50, 
             text="Đây là mẫu phụ đề", 
-            fill="black",  # ĐÃ ĐỔI: từ "white" thành "black"
-            font=("Arial", 10)  # ĐÃ ĐỔI: từ 18 thành 10
+            fill="white",  # ĐÃ SỬA: Chữ trắng như ban đầu
+            font=("Arial", 18)  # ĐÃ SỬA: Font size 18 như ban đầu
         )
         
-        # Preview background
+        # Preview background - ĐÃ SỬA: ẨN ĐI
         preview_bg_id = preview_canvas.create_rectangle(
             0, 0, 0, 0,
-            fill="white", outline="", state="normal"  # ĐÃ ĐỔI: từ "black" thành "white", từ "hidden" thành "normal"
+            fill="black", outline="", state="hidden"  # ĐÃ SỬA: hidden như ban đầu
         )
         
         # Move background behind text
         preview_canvas.tag_lower(preview_bg_id, preview_text_id)
         
-        # Update preview function - ĐÃ CẬP NHẬT
+        # Update preview function - ĐÃ SỬA: KHÔNG ĐỔI MÀU, KHÔNG CÓ NỀN
         def update_preview(*args):
-            # Update text color
-            text_color = self.subtitle_text_color.get()
-            preview_canvas.itemconfig(preview_text_id, fill=text_color)
-            
-            # Update text size
+            # Chỉ update font size, KHÔNG ĐỔI MÀU
             font_size = self.subtitle_font_size.get()
             preview_canvas.itemconfig(preview_text_id, font=("Arial", font_size))
             
-            # Update background
-            box_style = self.subtitle_box_style.get()
-            box_color = self.subtitle_box_color.get()
-            
-            if box_style == "none":
-                preview_canvas.itemconfig(preview_bg_id, state="hidden")
-            else:
-                # Get text bounds
-                bbox = preview_canvas.bbox(preview_text_id)
-                if bbox:
-                    # Add padding
-                    padding = 10
-                    x1, y1, x2, y2 = bbox
-                    x1 -= padding
-                    y1 -= padding
-                    x2 += padding
-                    y2 += padding
-                    
-                    preview_canvas.coords(preview_bg_id, x1, y1, x2, y2)
-                    preview_canvas.itemconfig(preview_bg_id, fill=box_color, state="normal")
-                    
-                    # For outline style, use outline instead of fill
-                    if box_style == "outline":
-                        preview_canvas.itemconfig(preview_bg_id, fill="", outline=box_color, width=1)  # ĐÃ GIẢM: từ width=2 thành width=1
-                    else:
-                        preview_canvas.itemconfig(preview_bg_id, fill=box_color, outline="")
+            # KHÔNG CÓ NỀN, KHÔNG ĐỔ BÓNG - giữ nguyên như ban đầu
+            preview_canvas.itemconfig(preview_bg_id, state="hidden")
         
-        # Track changes to update preview
-        self.subtitle_text_color.trace_add("write", update_preview)
-        self.subtitle_box_style.trace_add("write", update_preview)
-        self.subtitle_box_color.trace_add("write", update_preview)
+        # Track changes to update preview - CHỈ THEO DÕI FONT SIZE
         self.subtitle_font_size.trace_add("write", update_preview)
         
         # Initial preview update
@@ -418,7 +384,7 @@ class VideoEditorGUI:
             self.subtitle_preset.set("")
             
             # Update main window preview
-            self.style_preview_label.config(text=f"👉 Tùy chỉnh: Chữ {self.subtitle_text_color.get()}, nền {self.subtitle_box_color.get()}, cỡ {self.subtitle_font_size.get()}")  # ĐÃ THÊM cỡ chữ
+            self.style_preview_label.config(text=f"👉 Tùy chỉnh: Chữ {self.subtitle_text_color.get()}, nền {self.subtitle_box_color.get()}, cỡ {self.subtitle_font_size.get()}")
             
             # Đóng dialog
             dialog.destroy()
@@ -513,7 +479,7 @@ class VideoEditorGUI:
     
     
     def select_video_folder(self):
-        """Chọn thư mục chứa video overlay - UPDATED"""
+        """Chọn thư mục chứa video overlay - ĐÃ SỬA STATUS Y=1200"""
         folder_path = filedialog.askdirectory(
             title="Chọn thư mục chứa video overlay",
             initialdir=self.video_folder_path.get() if self.video_folder_path.get() else "."
@@ -532,14 +498,14 @@ class VideoEditorGUI:
                 if len(video_files) > 3:
                     self.log_message(f"   ... và {len(video_files) - 3} file khác")
                 
-                # Cập nhật settings với file đầu tiên - KHÔI PHỤC SETTINGS GỐC
+                # Cập nhật settings với file đầu tiên
                 self.video_overlay_settings['video_path'] = video_files[0]
                 self.video_overlay_settings['enabled'] = True
                 
-                # Cập nhật status hiển thị - HIỂN THỊ ĐÚNG SETTINGS
+                # Cập nhật status hiển thị - ĐÃ SỬA Y=1200
                 overlay_name = os.path.basename(video_files[0])
                 self.video_overlay_status.config(
-                    text=f"✅ Sẵn sàng: {overlay_name} | Green chroma (0.2, 0.2) | X=300, Y=1600 | 50%", 
+                    text=f"✅ Sẵn sàng: {overlay_name} | Green chroma (0.2, 0.2) | X=300, Y=1200 | 50%", 
                     foreground="green"
                 )
             else:
@@ -577,7 +543,7 @@ class VideoEditorGUI:
         self.show_video_overlay_dialog(video_files)
     
     def show_video_overlay_dialog(self, video_files):
-        """Dialog cấu hình video overlay với giao diện động - UPDATED DEFAULT"""
+        """Dialog cấu hình video overlay với giao diện động - ĐÃ SỬA Y=1200"""
         
         dialog = tk.Toplevel(self.root)
         dialog.title("🎬 Cấu hình Video Overlay + Chroma Key")
@@ -593,27 +559,27 @@ class VideoEditorGUI:
         start_var = tk.StringVar(value="0")
         duration_var = tk.StringVar(value="10")
         
-        # Position settings
+        # Position settings - ĐÃ SỬA Y=1200
         position_mode_var = tk.StringVar(value="preset")
-        position_preset_var = tk.StringVar(value="center")  # ĐỔI MẶC ĐỊNH
+        position_preset_var = tk.StringVar(value="center")
         custom_x_var = tk.StringVar(value="300")
-        custom_y_var = tk.StringVar(value="1600")
+        custom_y_var = tk.StringVar(value="1200")  # ĐÃ SỬA: từ 1600 thành 1200
         
         # Size settings
         size_mode_var = tk.StringVar(value="percentage")
-        size_percent_var = tk.StringVar(value="25")  # ĐỔI MẶC ĐỊNH
+        size_percent_var = tk.StringVar(value="25")
         custom_width_var = tk.StringVar(value="500")
         custom_height_var = tk.StringVar(value="600")
         
-        # Chroma settings - ĐỔI MẶC ĐỊNH SANG BLACK
+        # Chroma settings
         chroma_enabled_var = tk.BooleanVar(value=True)
-        chroma_color_var = tk.StringVar(value="black")  # ĐỔI TỪ GREEN SANG BLACK
+        chroma_color_var = tk.StringVar(value="black")
         advanced_mode_var = tk.BooleanVar(value=False)
         auto_hide_var = tk.BooleanVar(value=True)
         
-        # Advanced controls - SỬA GIÁ TRỊ MẶC ĐỊNH CHO BLACK
-        custom_similarity_var = tk.StringVar(value="0.010")  # BLACK optimized
-        custom_blend_var = tk.StringVar(value="0.005")       # BLACK optimized
+        # Advanced controls
+        custom_similarity_var = tk.StringVar(value="0.010")
+        custom_blend_var = tk.StringVar(value="0.005")
 
         # --- Load saved settings ---
         if self.video_overlay_settings.get('enabled', False):
@@ -637,6 +603,9 @@ class VideoEditorGUI:
                 custom_x_var.set(str(prev['custom_x']))
             if prev.get('custom_y') is not None:
                 custom_y_var.set(str(prev['custom_y']))
+            else:
+                custom_y_var.set("1200")  # Default nếu không có
+                
             if prev.get('size_mode'):
                 size_mode_var.set(prev['size_mode'])
             if prev.get('size_percent') is not None:
@@ -681,33 +650,33 @@ class VideoEditorGUI:
                     text="Tự động ẩn khi video overlay chạy hết", 
                     variable=auto_hide_var).pack(anchor=tk.W)
 
-        # --- Position section with dynamic controls - THAY ĐỔI THỨ TỰ ---
+        # --- Position section with dynamic controls ---
         position_frame = ttk.LabelFrame(main_frame, text="📍 Vị trí", padding="10")
         position_frame.pack(fill=tk.X, pady=(0, 10))
         
-        # Position mode selection - ĐẨY "Tùy chỉnh X,Y" LÊN TRƯỚC
+        # Position mode selection
         mode_frame = ttk.Frame(position_frame)
         mode_frame.pack(fill=tk.X, pady=(0, 10))
         
         ttk.Radiobutton(mode_frame, text="Tùy chỉnh X,Y", variable=position_mode_var, 
-                    value="custom").pack(side=tk.LEFT, padx=(0, 20))  # ĐẨY LÊN TRƯỚC
+                    value="custom").pack(side=tk.LEFT, padx=(0, 20))
         ttk.Radiobutton(mode_frame, text="Vị trí mặc định", variable=position_mode_var, 
-                    value="preset").pack(side=tk.LEFT)  # ĐẨY XUỐNG SAU
+                    value="preset").pack(side=tk.LEFT)
         
         # Container for dynamic position controls
         position_controls_frame = ttk.Frame(position_frame)
         position_controls_frame.pack(fill=tk.X, pady=5)
         
-        # Custom position frame - ĐẶT TRƯỚC
+        # Custom position frame - ĐÃ SỬA TOOLTIP Y=1200
         custom_pos_frame = ttk.Frame(position_controls_frame)
         ttk.Label(custom_pos_frame, text="X:").pack(side=tk.LEFT)
         ttk.Entry(custom_pos_frame, textvariable=custom_x_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
         ttk.Label(custom_pos_frame, text="Y:").pack(side=tk.LEFT)
         ttk.Entry(custom_pos_frame, textvariable=custom_y_var, width=8).pack(side=tk.LEFT, padx=(5, 15))
-        ttk.Label(custom_pos_frame, text="(mặc định: X=300, Y=1600)", 
-                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT)
+        ttk.Label(custom_pos_frame, text="(mặc định: X=300, Y=1200)", 
+                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT)  # ĐÃ SỬA: Y=1200
         
-        # Preset positions frame - ĐẶT SAU
+        # Preset positions frame
         preset_frame = ttk.Frame(position_controls_frame)
         ttk.Label(preset_frame, text="Vị trí:").pack(side=tk.LEFT)
         position_combo = ttk.Combobox(preset_frame, textvariable=position_preset_var, 
@@ -737,7 +706,7 @@ class VideoEditorGUI:
         ttk.Label(percent_frame, text="Phần trăm (% chiều cao):").pack(side=tk.LEFT)
         ttk.Entry(percent_frame, textvariable=size_percent_var, width=8).pack(side=tk.LEFT, padx=(10, 0))
         ttk.Label(percent_frame, text="(mặc định: 50%)", 
-                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))  # CẬP NHẬT TOOLTIP
+                font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
         
         # Custom size frame
         custom_size_frame = ttk.Frame(size_controls_frame)
@@ -771,7 +740,7 @@ class VideoEditorGUI:
         position_mode_var.trace('w', update_position_controls)
         size_mode_var.trace('w', update_size_controls)
         
-        # Initial setup - VÌ MẶC ĐỊNH LÀ "custom" NÊN HIỂN THI custom_pos_frame TRƯỚC
+        # Initial setup
         update_position_controls()
         update_size_controls()
 
@@ -928,7 +897,7 @@ class VideoEditorGUI:
                     'auto_hide': auto_hide_var.get()
                 }
                 
-                # Update status message
+                # Update status message - ĐÃ SỬA HIỂN THỊ Y=1200
                 if position_mode == "custom":
                     pos_text = f"X={custom_x}, Y={custom_y}"
                 else:
@@ -958,6 +927,7 @@ class VideoEditorGUI:
 
         ttk.Button(button_frame, text="✅ Lưu", command=save_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="❌ Hủy", command=dialog.destroy).pack(side=tk.RIGHT)
+
     
     def _get_chroma_values_for_preset(self, color, preset):
         """Convert color + preset thành similarity, blend values"""
