@@ -64,27 +64,31 @@ class VideoEditorGUI:
         self.words_per_line = tk.IntVar(value=7)
         self.processing = False
         
-        # ✅ THÊM: Subtitle config system
+        # ✅ SỬA: KHỞI TẠO SUBTITLE VARIABLES
+        self.subtitle_preset = tk.StringVar(value="default")
+        self.subtitle_text_color = tk.StringVar(value="black")
+        self.subtitle_box_style = tk.StringVar(value="box")
+        self.subtitle_box_color = tk.StringVar(value="white")
+        self.subtitle_font_size = tk.IntVar(value=10)
+        self.subtitle_position = tk.StringVar(value="bottom_center")
+        self.custom_margin_v = tk.IntVar(value=50)
+        self.custom_margin_l = tk.IntVar(value=0)
+        self.custom_margin_r = tk.IntVar(value=0)
+        
+        # ✅ SỬA: Khởi tạo SubtitleConfig
         if HAS_SUBTITLE_CONFIG:
             self.subtitle_config = SubtitleConfig()
-            
-            # GUI variables cho subtitle
-            self.subtitle_preset = tk.StringVar(value="default")
-            self.subtitle_text_color = tk.StringVar(value=self.subtitle_config.text_color)
-            self.subtitle_box_style = tk.StringVar(value=self.subtitle_config.box_style)
-            self.subtitle_box_color = tk.StringVar(value=self.subtitle_config.box_color)
-            self.subtitle_font_size = tk.IntVar(value=self.subtitle_config.font_size)
-            self.subtitle_position = tk.StringVar(value=self.subtitle_config.position)
-            self.custom_margin_v = tk.IntVar(value=self.subtitle_config.custom_margin_v)
-            self.custom_margin_l = tk.IntVar(value=self.subtitle_config.custom_margin_l)
-            self.custom_margin_r = tk.IntVar(value=self.subtitle_config.custom_margin_r)
         else:
-            # Fallback to old system
-            self.subtitle_preset = tk.StringVar(value="default")
-            self.subtitle_text_color = tk.StringVar(value="black")
-            self.subtitle_box_style = tk.StringVar(value="box")
-            self.subtitle_box_color = tk.StringVar(value="white")
-            self.subtitle_font_size = tk.IntVar(value=10)
+            self.subtitle_config = None
+        
+        # ✅ SỬA: BIND EVENTS CHO SUBTITLE VARIABLES
+        self.subtitle_preset.trace_add("write", self._on_subtitle_change)
+        self.subtitle_text_color.trace_add("write", self._on_subtitle_change)
+        self.subtitle_box_style.trace_add("write", self._on_subtitle_change)
+        self.subtitle_box_color.trace_add("write", self._on_subtitle_change)
+        self.subtitle_font_size.trace_add("write", self._on_subtitle_change)
+        self.source_language.trace_add("write", self._on_subtitle_change)
+        self.target_language.trace_add("write", self._on_subtitle_change)
         
         # Overlay settings (giữ nguyên code cũ)
         self.overlay_times = {}
@@ -94,21 +98,32 @@ class VideoEditorGUI:
             'chroma_color': 'green',
             'chroma_similarity': 0.2,
             'chroma_blend': 0.2,
-            
             'position_mode': 'custom',
             'position': 'custom',
             'custom_x': 300,
             'custom_y': 1200,
-            
             'size_mode': 'percentage',
             'size_percent': 50,
-            
             'start_time': 5,
             'duration': 15,
             'auto_hide': True
         }
         
         self.setup_ui()
+
+    def _on_subtitle_change(self, *args):
+        """Callback khi có thay đổi subtitle settings"""
+        try:
+            print(f"🔄 Subtitle setting changed")
+            print(f"  text_color: {self.subtitle_text_color.get()}")
+            print(f"  box_style: {self.subtitle_box_style.get()}")
+            print(f"  box_color: {self.subtitle_box_color.get()}")
+            print(f"  font_size: {self.subtitle_font_size.get()}")
+            
+            self.update_subtitle_preview()
+            
+        except Exception as e:
+            print(f"❌ Error in subtitle change callback: {e}")
 
     def open_image_processor(self):
         """Mở Image Processing Tool trong cửa sổ riêng"""
@@ -136,198 +151,279 @@ class VideoEditorGUI:
             self.log_message(f"❌ Lỗi mở Image Processing: {str(e)}")  
 
     def open_subtitle_advanced_config(self):
-        """Mở dialog cấu hình subtitle nâng cao tổng hợp"""
-        if not HAS_SUBTITLE_CONFIG:
-            messagebox.showwarning("Cảnh báo", "Subtitle config system không khả dụng!\nSử dụng cấu hình cơ bản.")
-            self.configure_subtitle_style()  # Fallback to old method
-            return
-            
+        """Dialog cấu hình nâng cao với preview canvas hoạt động - ĐÃ SỬA KÍCH THƯỚC"""
+        
         dialog = tk.Toplevel(self.root)
-        dialog.title("🎨 Cấu hình Phụ đề Toàn diện")
-        dialog.geometry("700x600")
+        dialog.title("🎨 Cấu hình Phụ đề Chi tiết")
+        dialog.geometry("750x650")  # ✅ SỬA: Kích thước lớn hơn
         dialog.transient(self.root)
         dialog.grab_set()
         
+        # Main frame
         main_frame = ttk.Frame(dialog, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
         
         # Title
-        ttk.Label(main_frame, text="🎨 Cấu hình Phụ đề Toàn diện", 
+        ttk.Label(main_frame, text="🎨 Cấu hình Kiểu dáng Phụ đề", 
                 font=("Arial", 16, "bold")).pack(pady=(0, 20))
         
-        # Language info
-        info_frame = ttk.Frame(main_frame)
-        info_frame.pack(fill=tk.X, pady=(0, 15))
+        # ✅ SỬA: Local variables cho dialog
+        dialog_text_color = tk.StringVar(value=self.subtitle_text_color.get())
+        dialog_box_style = tk.StringVar(value=self.subtitle_box_style.get())
+        dialog_box_color = tk.StringVar(value=self.subtitle_box_color.get())
+        dialog_font_size = tk.IntVar(value=self.subtitle_font_size.get())
         
-        current_lang = self.source_language.get()
-        lang_config = self.subtitle_config.get_language_config(current_lang)
-        
-        ttk.Label(info_frame, text=f"🌐 Ngôn ngữ hiện tại: {current_lang.upper()}", 
-                font=("Arial", 10, "bold")).pack(side=tk.LEFT)
-        ttk.Label(info_frame, 
-                text=f"(Khuyến nghị: {lang_config['words_per_line']} từ/dòng, font +{lang_config['font_size_adjust']})", 
-                font=("Arial", 9), foreground="blue").pack(side=tk.LEFT, padx=(10, 0))
-        
-        # Style section
-        style_frame = ttk.LabelFrame(main_frame, text="🎨 Kiểu dáng", padding="10")
-        style_frame.pack(fill=tk.X, pady=(0, 15))
-        
-        # Preset selection
-        preset_frame = ttk.Frame(style_frame)
-        preset_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(preset_frame, text="Preset:", width=15).pack(side=tk.LEFT)
-        preset_combo = ttk.Combobox(
-            preset_frame,
-            textvariable=self.subtitle_preset,
-            values=self.subtitle_config.get_available_presets() + ["custom"],
-            state="readonly",
-            width=15
-        )
-        preset_combo.pack(side=tk.LEFT, padx=(10, 0))
+        # Controls
+        controls_frame = ttk.Frame(main_frame)
+        controls_frame.pack(fill=tk.X, pady=(0, 20))
         
         # Text color
-        text_frame = ttk.Frame(style_frame)
+        text_frame = ttk.Frame(controls_frame)
         text_frame.pack(fill=tk.X, pady=5)
         ttk.Label(text_frame, text="Màu chữ:", width=15).pack(side=tk.LEFT)
         text_color_combo = ttk.Combobox(
             text_frame,
-            textvariable=self.subtitle_text_color,
-            values=self.subtitle_config.get_available_colors(),
+            textvariable=dialog_text_color,
+            values=["black", "white", "red", "green", "blue", "yellow", "cyan", "magenta", "orange", "purple", "pink"],
             state="readonly",
-            width=12
+            width=15
         )
         text_color_combo.pack(side=tk.LEFT, padx=(10, 0))
         
         # Box style
-        box_frame = ttk.Frame(style_frame)
+        box_frame = ttk.Frame(controls_frame)
         box_frame.pack(fill=tk.X, pady=5)
         ttk.Label(box_frame, text="Kiểu nền:", width=15).pack(side=tk.LEFT)
         box_style_combo = ttk.Combobox(
             box_frame,
-            textvariable=self.subtitle_box_style,
-            values=self.subtitle_config.get_available_box_styles(),
+            textvariable=dialog_box_style,
+            values=["none", "outline", "box", "rounded_box", "shadow_box"],
             state="readonly",
-            width=12
+            width=15
         )
         box_style_combo.pack(side=tk.LEFT, padx=(10, 0))
         
         # Box color
-        box_color_frame = ttk.Frame(style_frame)
+        box_color_frame = ttk.Frame(controls_frame)
         box_color_frame.pack(fill=tk.X, pady=5)
         ttk.Label(box_color_frame, text="Màu nền:", width=15).pack(side=tk.LEFT)
         box_color_combo = ttk.Combobox(
             box_color_frame,
-            textvariable=self.subtitle_box_color,
-            values=self.subtitle_config.get_available_colors(),
+            textvariable=dialog_box_color,
+            values=["black", "white", "red", "green", "blue", "yellow", "cyan", "magenta", "orange", "purple", "pink"],
             state="readonly",
-            width=12
+            width=15
         )
         box_color_combo.pack(side=tk.LEFT, padx=(10, 0))
         
         # Font size
-        font_frame = ttk.Frame(style_frame)
+        font_frame = ttk.Frame(controls_frame)
         font_frame.pack(fill=tk.X, pady=5)
         ttk.Label(font_frame, text="Cỡ chữ:", width=15).pack(side=tk.LEFT)
         font_size_spinbox = ttk.Spinbox(
             font_frame,
             from_=6, to=24, increment=1,
-            textvariable=self.subtitle_font_size,
+            textvariable=dialog_font_size,
             width=8
         )
         font_size_spinbox.pack(side=tk.LEFT, padx=(10, 0))
         
-        adjusted_size = self.subtitle_config.get_adjusted_font_size(current_lang)
-        ttk.Label(font_frame, text=f"→ Thực tế: {adjusted_size}", 
-                foreground="blue").pack(side=tk.LEFT, padx=(10, 0))
+        # ✅ SỬA: Preview canvas HOẠT ĐỘNG THỰC SỰ
+        preview_frame = ttk.LabelFrame(main_frame, text="🔍 Xem trước", padding="15")
+        preview_frame.pack(fill=tk.X, pady=(0, 20))
         
-        # Position section
-        position_frame = ttk.LabelFrame(main_frame, text="📍 Vị trí", padding="10")
-        position_frame.pack(fill=tk.X, pady=(0, 15))
+        preview_canvas = tk.Canvas(preview_frame, width=600, height=100, bg="gray30")
+        preview_canvas.pack(pady=10)
         
-        # Position preset
-        pos_preset_frame = ttk.Frame(position_frame)
-        pos_preset_frame.pack(fill=tk.X, pady=5)
-        ttk.Label(pos_preset_frame, text="Vị trí:", width=15).pack(side=tk.LEFT)
-        
-        if hasattr(self.subtitle_config, 'get_available_positions'):
-            position_descriptions = self.subtitle_config.get_available_positions()
-        else:
-            position_descriptions = {"bottom_center": "Dưới giữa", "center": "Giữa màn hình"}
-            
-        position_combo = ttk.Combobox(
-            pos_preset_frame,
-            textvariable=self.subtitle_position,
-            values=list(position_descriptions.keys()),
-            state="readonly",
-            width=20
+        # Canvas elements
+        text_id = preview_canvas.create_text(
+            300, 50,
+            text="Đây là mẫu phụ đề",
+            fill="black",
+            font=("Arial", 12),
+            anchor="center"
         )
-        position_combo.pack(side=tk.LEFT, padx=(10, 0))
         
-        # Custom margins
-        if hasattr(self, 'custom_margin_v'):
-            margin_frame = ttk.Frame(position_frame)
-            margin_frame.pack(fill=tk.X, pady=10)
-            
-            # Margin V
-            margin_v_frame = ttk.Frame(margin_frame)
-            margin_v_frame.pack(fill=tk.X, pady=2)
-            ttk.Label(margin_v_frame, text="Khoảng cách dọc:", width=15).pack(side=tk.LEFT)
-            margin_v_spinbox = ttk.Spinbox(
-                margin_v_frame,
-                from_=0, to=500, increment=10,
-                textvariable=self.custom_margin_v,
-                width=10
-            )
-            margin_v_spinbox.pack(side=tk.LEFT, padx=(10, 0))
+        bg_id = preview_canvas.create_rectangle(
+            0, 0, 0, 0,
+            fill="white",
+            outline="",
+            state="hidden"
+        )
         
-        # Buttons
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(30, 0))
+        preview_canvas.tag_lower(bg_id, text_id)
+        
+        # ✅ SỬA: Preview update function HOẠT ĐỘNG
+        def update_canvas_preview(*args):
+            try:
+                text_color = dialog_text_color.get()
+                box_style = dialog_box_style.get()
+                box_color = dialog_box_color.get()
+                font_size = dialog_font_size.get()
+                
+                print(f"🔍 Canvas preview: {text_color} text, {box_style} {box_color} bg, font {font_size}")
+                
+                # Color mapping for canvas
+                color_map = {
+                    "black": "black", "white": "white", "red": "red",
+                    "green": "green", "blue": "blue", "yellow": "yellow",
+                    "cyan": "cyan", "magenta": "magenta", "orange": "orange",
+                    "purple": "purple", "pink": "pink"
+                }
+                
+                canvas_text_color = color_map.get(text_color, "black")
+                canvas_box_color = color_map.get(box_color, "white")
+                
+                # Update text
+                preview_canvas.itemconfig(text_id,
+                                        fill=canvas_text_color,
+                                        font=("Arial", max(8, min(20, font_size))))
+                
+                # Update background
+                if box_style in ["box", "rounded_box", "shadow_box"]:
+                    bbox = preview_canvas.bbox(text_id)
+                    if bbox:
+                        padding = 15
+                        x1, y1, x2, y2 = bbox
+                        x1 -= padding
+                        y1 -= padding
+                        x2 += padding
+                        y2 += padding
+                        
+                        preview_canvas.coords(bg_id, x1, y1, x2, y2)
+                        preview_canvas.itemconfig(bg_id,
+                                                fill=canvas_box_color,
+                                                state="normal")
+                        
+                        print(f"✅ Canvas updated: {canvas_text_color} text on {canvas_box_color} background")
+                else:
+                    preview_canvas.itemconfig(bg_id, state="hidden")
+                    print(f"✅ Canvas updated: {canvas_text_color} text, no background")
+                    
+            except Exception as e:
+                print(f"❌ Canvas preview error: {e}")
+        
+        # ✅ QUAN TRỌNG: BIND TẤT CẢ EVENTS
+        dialog_text_color.trace_add("write", update_canvas_preview)
+        dialog_box_style.trace_add("write", update_canvas_preview)
+        dialog_box_color.trace_add("write", update_canvas_preview)
+        dialog_font_size.trace_add("write", update_canvas_preview)
+        
+        text_color_combo.bind("<<ComboboxSelected>>", update_canvas_preview)
+        box_style_combo.bind("<<ComboboxSelected>>", update_canvas_preview)
+        box_color_combo.bind("<<ComboboxSelected>>", update_canvas_preview)
+        
+        font_size_spinbox.bind("<KeyRelease>", update_canvas_preview)
+        font_size_spinbox.bind("<<Increment>>", update_canvas_preview)
+        font_size_spinbox.bind("<<Decrement>>", update_canvas_preview)
+        
+        # Initial preview
+        update_canvas_preview()
+        
+        # ✅ SỬA: Buttons cố định ở cuối dialog
+        button_frame = ttk.Frame(dialog)  # ✅ SỬA: Gắn vào dialog, không phải main_frame
+        button_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=15, padx=20)
         
         def apply_settings():
-            self.update_subtitle_preview()
-            dialog.destroy()
+            try:
+                # Copy values về main GUI
+                self.subtitle_text_color.set(dialog_text_color.get())
+                self.subtitle_box_style.set(dialog_box_style.get())
+                self.subtitle_box_color.set(dialog_box_color.get())
+                self.subtitle_font_size.set(dialog_font_size.get())
+                self.subtitle_preset.set("custom")  # Mark as custom
+                
+                print(f"✅ Applied: {dialog_text_color.get()} text, {dialog_box_style.get()} {dialog_box_color.get()} bg")
+                
+                # Update main preview
+                self.update_subtitle_preview()
+                
+                dialog.destroy()
+                
+            except Exception as e:
+                print(f"❌ Apply error: {e}")
+                dialog.destroy()
         
         ttk.Button(button_frame, text="✓ Áp dụng", command=apply_settings).pack(side=tk.LEFT, padx=(0, 10))
         ttk.Button(button_frame, text="❌ Hủy", command=dialog.destroy).pack(side=tk.RIGHT)  
 
-    def update_subtitle_preview(self, *args):
-        """Cập nhật preview subtitle"""
+    def update_words_recommendation(self, *args):
+        """Cập nhật words per line theo NGÔN NGỮ ĐÍCH (target_language)"""
         try:
-            current_lang = self.source_language.get()
+            # ✅ SỬA: Dùng target_language thay vì source_language
+            target_lang = self.target_language.get()  # Thay đổi từ source_language
             
-            if HAS_SUBTITLE_CONFIG:
-                preset = self.subtitle_preset.get()
-                position = self.subtitle_position.get()
+            if HAS_SUBTITLE_CONFIG and hasattr(self, 'subtitle_config'):
+                # ✅ SỬA: Lấy config cho ngôn ngữ đích
+                lang_config = self.subtitle_config.get_language_config(target_lang)
+                recommended = lang_config['words_per_line']
                 
-                position_descriptions = self.subtitle_config.get_available_positions()
-                pos_desc = position_descriptions.get(position, "Tùy chỉnh")
+                # Auto-apply giá trị khuyến nghị
+                self.words_per_line.set(recommended)
                 
-                if preset and preset != "custom":
-                    text = f"👉 {preset.title()}: {pos_desc}, auto-adjust cho {current_lang.upper()}"
+                # ✅ SỬA: Đơn vị dựa trên ngôn ngữ đích
+                if target_lang.startswith(('zh', 'ja', 'ko')):
+                    unit = "ký tự"
                 else:
-                    text_color = self.subtitle_text_color.get()
-                    box_color = self.subtitle_box_color.get()
-                    font_size = self.subtitle_font_size.get()
-                    adjusted_size = self.subtitle_config.get_adjusted_font_size(current_lang)
-                    text = f"👉 Tùy chỉnh: {text_color} text, {box_color} bg, {pos_desc}, size {font_size}→{adjusted_size}"
+                    unit = "từ"
+                    
+                self.words_recommended_label.config(
+                    text=f"(auto: {recommended} {unit} cho {target_lang.upper()})"
+                )
+                
+                print(f"🔄 Updated words_per_line: {recommended} {unit} for target language: {target_lang}")
+                
             else:
-                # Fallback for old system
-                text_color = self.subtitle_text_color.get()
-                box_color = self.subtitle_box_color.get()
-                font_size = self.subtitle_font_size.get()
-                text = f"👉 Tùy chỉnh: {text_color} text, {box_color} bg, size {font_size}"
+                self.words_recommended_label.config(text="(4-15)")
+                
+        except Exception as e:
+            print(f"❌ Error updating words recommendation: {e}")
+            self.words_recommended_label.config(text="(4-15)")
+
+    def update_subtitle_preview(self, *args):
+        """Cập nhật preview với words per line info"""
+        try:
+            if not hasattr(self, 'subtitle_preview_label') or not self.subtitle_preview_label:
+                return
             
-            if hasattr(self, 'subtitle_preview_label'):
-                self.subtitle_preview_label.config(text=text)
-            elif hasattr(self, 'style_preview_label'):
-                self.style_preview_label.config(text=text)
+            current_lang = self.source_language.get()
+            preset = self.subtitle_preset.get()
+            text_color = self.subtitle_text_color.get()
+            box_style = self.subtitle_box_style.get()
+            box_color = self.subtitle_box_color.get()
+            font_size = self.subtitle_font_size.get()
+            words_per_line = self.words_per_line.get()  # ✅ THÊM: Actual value
+            
+            # ✅ THÊM: Get recommended value
+            if HAS_SUBTITLE_CONFIG and hasattr(self, 'subtitle_config'):
+                lang_config = self.subtitle_config.get_language_config(current_lang)
+                recommended = lang_config['words_per_line']
+                unit = "ký tự" if current_lang.startswith(('zh', 'ja', 'ko')) else "từ"
+                
+                words_info = f"{words_per_line} {unit}"
+                if words_per_line != recommended:
+                    words_info += f" (khuyến nghị: {recommended})"
+            else:
+                words_info = f"{words_per_line} từ"
+            
+            # Tạo preview text với words per line info
+            if preset and preset != "custom":
+                text = f"👉 {preset.title()}: {text_color} text, {box_style} {box_color} bg, {current_lang.upper()}→{self.target_language.get().upper()}, font {font_size}, {words_info}"
+            else:
+                text = f"👉 Tùy chỉnh: {text_color} text, {box_style} {box_color} bg, {current_lang.upper()}→{self.target_language.get().upper()}, font {font_size}, {words_info}"
+            
+            self.subtitle_preview_label.config(text=text)
+            print(f"🔍 Preview updated with words info: {text}")
             
         except Exception as e:
-            print(f"Error updating subtitle preview: {e}")
+            print(f"❌ Error updating preview: {e}")
+            try:
+                self.subtitle_preview_label.config(text="👉 Cấu hình phụ đề")
+            except:
+                pass
 
     def setup_ui(self):
-        """Thiết lập giao diện người dùng - ĐÃ SỬA STATUS MESSAGE"""
+        """Thiết lập giao diện người dùng - ĐÃ SỬA GỘP NGÔN NGỮ + SUBTITLE"""
         
         # Main frame
         main_frame = ttk.Frame(self.root, padding="10")
@@ -362,9 +458,14 @@ class VideoEditorGUI:
         ttk.Button(main_frame, text="Chọn thư mục", command=self.select_output_folder).grid(row=row, column=2, padx=(5, 0), pady=5)
         row += 1
         
-        # Language and subtitle options
-        lang_frame = ttk.Frame(main_frame)
-        lang_frame.grid(row=row, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
+        # ✅ GỘP: Ngôn ngữ + Phụ đề trong một khung (THAY THẾ phần cũ)
+        subtitle_config_frame = ttk.LabelFrame(main_frame, text="🎨 Cấu hình Phụ đề & Ngôn ngữ", padding="10")
+        subtitle_config_frame.grid(row=row, column=0, columnspan=3, pady=(10, 10), sticky=(tk.W, tk.E))
+        subtitle_config_frame.columnconfigure(1, weight=1)
+        
+        # Dòng 1: Checkbox + Ngôn ngữ gốc + Ngôn ngữ đích + Từ/dòng
+        lang_frame = ttk.Frame(subtitle_config_frame)
+        lang_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
         
         ttk.Checkbutton(
             lang_frame, 
@@ -376,7 +477,7 @@ class VideoEditorGUI:
         language_combo = ttk.Combobox(
             lang_frame, 
             textvariable=self.source_language,
-            values=["vi", "en", "zh", "zh-cn", "zh-tw", "ja", "ko", "es", "fr", "de"],  #  THÊM: zh, zh-cn, zh-tw
+            values=["vi", "en", "zh", "zh-cn", "zh-tw", "ja", "ko", "es", "fr", "de"],
             state="readonly",
             width=10
         )
@@ -386,27 +487,97 @@ class VideoEditorGUI:
         target_language_combo = ttk.Combobox(
             lang_frame, 
             textvariable=self.target_language,
-            values=["en", "vi", "zh", "zh-cn", "zh-tw", "ja", "ko", "es", "fr", "de"],  #  THÊM: zh, zh-cn, zh-tw
+            values=["en", "vi", "zh", "zh-cn", "zh-tw", "ja", "ko", "es", "fr", "de"],
             state="readonly",
             width=10
         )
-        target_language_combo.pack(side=tk.LEFT, padx=(10, 0))
+        target_language_combo.pack(side=tk.LEFT, padx=(10, 20))
         
-        # Words per line setting
         ttk.Label(lang_frame, text="📝 Từ/dòng:").pack(side=tk.LEFT, padx=(20, 5))
+
+        # Frame cho words per line
+        words_frame = ttk.Frame(lang_frame)
+        words_frame.pack(side=tk.LEFT)
+
+        # Spinbox cho manual override
         words_spinbox = ttk.Spinbox(
-            lang_frame,
-            from_=4, to=12,
+            words_frame,
+            from_=4, to=15,  # Tăng range để cover tiếng Trung
             textvariable=self.words_per_line,
             width=5,
-            state="readonly"
+            state="normal"  # Cho phép edit
         )
         words_spinbox.pack(side=tk.LEFT)
+
+        # Label hiển thị giá trị recommended
+        self.words_recommended_label = ttk.Label(
+            words_frame, 
+            text="(4-15)", 
+            font=("Arial", 8), 
+            foreground="gray"
+        )
+        self.words_recommended_label.pack(side=tk.LEFT, padx=(5, 0))
+
+        # Bind sự kiện - GỌI METHOD CỦA CLASS
         
-        # Tooltip
-        ttk.Label(lang_frame, text="(4-12 từ, khuyến nghị 6-7)", 
-                    font=("Arial", 8), foreground="gray").pack(side=tk.LEFT, padx=(5, 0))
+        self.target_language.trace_add("write", self.update_words_recommendation)
+
+        # Initial update - GỌI METHOD CỦA CLASS
+        self.update_words_recommendation()
         
+        # Dòng 2: Kiểu phụ đề + Nút cấu hình (BỎ phần vị trí)
+        style_frame = ttk.Frame(subtitle_config_frame)
+        style_frame.grid(row=1, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=10)
+        
+        ttk.Label(style_frame, text="🎨 Kiểu phụ đề:").pack(side=tk.LEFT)
+        preset_combo = ttk.Combobox(
+            style_frame,
+            textvariable=self.subtitle_preset,
+            values=["default", "custom"],
+            state="readonly",
+            width=12
+        )
+        preset_combo.pack(side=tk.LEFT, padx=(10, 20))
+        
+        ttk.Button(style_frame, text="⚙️ Cấu hình Chi tiết", 
+                command=self.open_subtitle_advanced_config).pack(side=tk.RIGHT)
+        
+        # Dòng 3: Preview (SỬA lỗi)
+        try:
+            self.subtitle_preview_label = ttk.Label(
+                subtitle_config_frame, 
+                text="👉 Mặc định: Chữ đen, nền trắng, dưới giữa, auto-adjust theo ngôn ngữ"
+            )
+            self.subtitle_preview_label.grid(row=2, column=0, columnspan=3, pady=5, sticky=tk.W)
+            
+        except Exception as e:
+            print(f"Lỗi tạo preview label: {e}")
+            # Fallback
+            self.subtitle_preview_label = ttk.Label(
+                subtitle_config_frame, 
+                text="👉 Mặc định"
+            )
+            self.subtitle_preview_label.grid(row=2, column=0, columnspan=3, pady=5, sticky=tk.W)
+        
+        
+        # Bind events để update preview khi thay đổi
+        def update_preview_wrapper(*args):
+            try:
+                self.update_subtitle_preview()
+            except Exception as e:
+                print(f"Lỗi update preview: {e}")
+
+        # Bind cho sự kiện chọn
+        preset_combo.bind("<<ComboboxSelected>>", update_preview_wrapper)
+        language_combo.bind("<<ComboboxSelected>>", update_preview_wrapper)
+        target_language_combo.bind("<<ComboboxSelected>>", update_preview_wrapper)
+
+        # Bind trace cho các StringVar để update realtime
+        self.subtitle_preset.trace_add("write", update_preview_wrapper)
+        self.source_language.trace_add("write", update_preview_wrapper)
+        self.target_language.trace_add("write", update_preview_wrapper)
+
+
         row += 1
         
         # Video overlay folder selection
@@ -423,87 +594,65 @@ class VideoEditorGUI:
         ttk.Button(overlay_frame, text="🎬 Cấu hình Video Overlay + Chroma Key", command=self.configure_video_overlay).pack(side=tk.LEFT, padx=(0, 10))
         row += 1
         
-        # Status label - ĐÃ SỬA Y=1200
+        # Status label
         self.video_overlay_status = ttk.Label(main_frame, text="✅ Sẵn sàng: Green chroma key (0.20, 0.20) | x=300, y=1200 | 50%", foreground="green")
         self.video_overlay_status.grid(row=row, column=0, columnspan=3, sticky=tk.W, pady=2)
         row += 1
         
-        # Tìm phần này trong setup_ui (sau video overlay configuration) và thêm:
-        
-        # ✅ THÊM: Image Processing button
+        # ✅ THÊM: Image Processing button màu sắc nổi bật
         image_frame = ttk.Frame(main_frame)
-        image_frame.grid(row=row, column=0, columnspan=3, pady=(10, 10), sticky=(tk.W, tk.E))
+        image_frame.grid(row=row, column=0, columnspan=3, pady=(15, 10), sticky=(tk.W, tk.E))
         
         if HAS_IMAGE_MODULE:
-            ttk.Button(
-                image_frame, 
-                text="🖼️ Mở Image Processing Tool", 
-                command=self.open_image_processor
-            ).pack(side=tk.LEFT, padx=(0, 10))
-            
-            ttk.Label(
-                image_frame, 
-                text="(Chèn logo/watermark vào ảnh hàng loạt)", 
-                font=("Arial", 9),
-                foreground="gray"
-            ).pack(side=tk.LEFT, padx=(10, 0))
+            # Tạo style cho nút đặc biệt
+            try:
+                style = ttk.Style()
+                style.configure("ImageTool.TButton", 
+                              foreground="blue", 
+                              font=("Arial", 11, "bold"))
+                
+                image_button = ttk.Button(
+                    image_frame, 
+                    text="🖼️ Mở Image Processing Tool", 
+                    command=self.open_image_processor,
+                    style="ImageTool.TButton"
+                )
+                image_button.pack(side=tk.LEFT, padx=(0, 15), ipady=8)
+                
+                # Label mô tả với màu sắc
+                desc_label = ttk.Label(
+                    image_frame, 
+                    text="✨ Chèn logo/watermark vào ảnh hàng loạt ✨", 
+                    font=("Arial", 10, "italic"),
+                    foreground="orange"
+                )
+                desc_label.pack(side=tk.LEFT, padx=(10, 0))
+                
+                # Thêm icon decorator
+                decorator_frame = ttk.Frame(image_frame)
+                decorator_frame.pack(side=tk.RIGHT, padx=(10, 0))
+                
+                ttk.Label(decorator_frame, text="🎨", font=("Arial", 16)).pack(side=tk.LEFT, padx=2)
+                ttk.Label(decorator_frame, text="📸", font=("Arial", 16)).pack(side=tk.LEFT, padx=2)
+                ttk.Label(decorator_frame, text="✂️", font=("Arial", 16)).pack(side=tk.LEFT, padx=2)
+                
+            except Exception as e:
+                print(f"Lỗi tạo image button: {e}")
+                # Fallback button đơn giản
+                ttk.Button(
+                    image_frame, 
+                    text="🖼️ Mở Image Processing Tool", 
+                    command=self.open_image_processor
+                ).pack(side=tk.LEFT)
+                
         else:
-            ttk.Label(
+            error_label = ttk.Label(
                 image_frame, 
                 text="⚠️ Image Processing không khả dụng (thiếu module gui_img)", 
-                foreground="red"
-            ).pack(side=tk.LEFT)
-        
-        row += 1
-
-        # Thêm phần tùy chỉnh phụ đề ở đây (trước nút Process)
-        # ✅ THAY THẾ: Phần cấu hình phụ đề tổng hợp (thay thế _create_subtitle_style_section cũ)
-        subtitle_config_frame = ttk.LabelFrame(main_frame, text="🎨 Cấu hình Phụ đề Tổng hợp", padding="10")
-        subtitle_config_frame.grid(row=row, column=0, columnspan=3, pady=(10, 10), sticky=(tk.W, tk.E))
-        subtitle_config_frame.columnconfigure(1, weight=1)
-        
-        # Quick config row
-        quick_frame = ttk.Frame(subtitle_config_frame)
-        quick_frame.grid(row=0, column=0, columnspan=3, sticky=(tk.W, tk.E), pady=5)
-        
-        ttk.Label(quick_frame, text="Kiểu:").pack(side=tk.LEFT)
-        preset_combo = ttk.Combobox(
-            quick_frame,
-            textvariable=self.subtitle_preset,
-            values=["default", "custom"],
-            state="readonly",
-            width=12
-        )
-        preset_combo.pack(side=tk.LEFT, padx=(10, 20))
-        
-        ttk.Label(quick_frame, text="Vị trí:").pack(side=tk.LEFT)
-        position_values = ["bottom_center", "center", "top_center", "bottom_left", "bottom_right", "custom"]
-        
-        if HAS_SUBTITLE_CONFIG:
-            position_values = list(self.subtitle_config.get_available_positions().keys())
-        
-        position_combo = ttk.Combobox(
-            quick_frame,
-            textvariable=getattr(self, 'subtitle_position', tk.StringVar(value="bottom_center")),
-            values=position_values,
-            state="readonly",
-            width=15
-        )
-        position_combo.pack(side=tk.LEFT, padx=(10, 20))
-        
-        ttk.Button(quick_frame, text="⚙️ Cấu hình Chi tiết", 
-                command=self.open_subtitle_advanced_config).pack(side=tk.RIGHT)
-        
-        # Preview row
-        self.subtitle_preview_label = ttk.Label(
-            subtitle_config_frame, 
-            text="👉 Mặc định: Chữ đen, nền trắng, dưới giữa, auto-adjust theo ngôn ngữ"
-        )
-        self.subtitle_preview_label.grid(row=1, column=0, columnspan=3, pady=5)
-        
-        # Bind events to update preview
-        preset_combo.bind("<<ComboboxSelected>>", self.update_subtitle_preview)
-        position_combo.bind("<<ComboboxSelected>>", self.update_subtitle_preview)
+                foreground="red",
+                font=("Arial", 10, "bold")
+            )
+            error_label.pack(side=tk.LEFT)
         
         row += 1
         
@@ -547,9 +696,11 @@ class VideoEditorGUI:
         # Configure row weight for log text
         main_frame.rowconfigure(row, weight=1)
         
-        # Initial log - ĐÃ SỬA MESSAGE Y=1200
+        # Initial log
         self.log_message("🎬 GUI Batch Video Processing đã sẵn sàng!")
-        self.log_message("💡 Mặc định: Green chroma key, tạo phụ đề, video overlay enabled")
+        self.log_message("💡 Đã hỗ trợ tiếng Trung Quốc (zh, zh-cn, zh-tw)")
+        self.log_message("🎨 Đã gộp cấu hình ngôn ngữ + phụ đề vào một chỗ")
+        self.log_message("🖼️ Thêm Image Processing Tool riêng biệt")
         self.log_message("📁 Hướng dẫn: Chọn thư mục input, output, sau đó bắt đầu xử lý")
 
     def _create_subtitle_style_section(self, parent, row):
@@ -594,7 +745,7 @@ class VideoEditorGUI:
         """Hiển thị dialog cấu hình kiểu phụ đề tùy chỉnh - ĐÃ SỬA UI VÀ PREVIEW"""
         dialog = tk.Toplevel(self.root)
         dialog.title("🎨 Tùy chỉnh kiểu phụ đề")
-        dialog.geometry("600x500")  # Tăng kích thước
+        dialog.geometry("750x500")  # Tăng kích thước
         dialog.transient(self.root)
         dialog.grab_set()
 
@@ -766,39 +917,65 @@ class VideoEditorGUI:
         cancel_button.pack(side=tk.RIGHT)
 
     def get_subtitle_style(self):
-        """Lấy cấu hình subtitle theo format mới với fallback"""
-        if HAS_SUBTITLE_CONFIG:
-            # Update subtitle config from GUI
-            gui_vars = {
-                'preset': self.subtitle_preset,
-                'text_color': self.subtitle_text_color,
-                'box_style': self.subtitle_box_style,
-                'box_color': self.subtitle_box_color,
-                'font_size': self.subtitle_font_size,
-                'position': getattr(self, 'subtitle_position', tk.StringVar(value="bottom_center")),
-                'custom_margin_v': getattr(self, 'custom_margin_v', tk.IntVar(value=50)),
-                'custom_margin_l': getattr(self, 'custom_margin_l', tk.IntVar(value=0)),
-                'custom_margin_r': getattr(self, 'custom_margin_r', tk.IntVar(value=0))
+        """Lấy cấu hình subtitle để truyền cho video processor - ĐÃ SỬA ĐÚNG"""
+        
+        print(f"\n🔍 ==> GET_SUBTITLE_STYLE DEBUG <==")
+        
+        # Lấy values hiện tại từ GUI
+        text_color = self.subtitle_text_color.get()
+        box_style = self.subtitle_box_style.get()  
+        box_color = self.subtitle_box_color.get()
+        font_size = self.subtitle_font_size.get()
+        preset = self.subtitle_preset.get()
+        
+        print(f"📋 GUI Values:")
+        print(f"  text_color: {text_color}")
+        print(f"  box_style: {box_style}")
+        print(f"  box_color: {box_color}")
+        print(f"  font_size: {font_size}")
+        print(f"  preset: {preset}")
+        
+        # Kiểm tra xem có sử dụng preset không
+        if preset and preset != "custom":
+            print(f"✅ Using preset: {preset}")
+            result = {
+                "preset": preset,
+                "use_preset": True
             }
-            
-            self.subtitle_config = create_subtitle_config_from_gui(gui_vars)
-            
-            # Return legacy format for compatibility
-            current_lang = self.source_language.get()
-            return get_legacy_subtitle_style(self.subtitle_config, current_lang)
         else:
-            # Fallback to old system
-            preset = self.subtitle_preset.get()
-            if preset and preset != "custom":
-                return {"preset": preset}
-            else:
-                return {
-                    "text_color": self.subtitle_text_color.get(),
-                    "box_style": self.subtitle_box_style.get(),
-                    "box_color": self.subtitle_box_color.get(),
-                    "font_size": self.subtitle_font_size.get()
-                }
+            print(f"✅ Using custom settings")
+            result = {
+                "text_color": text_color,
+                "box_style": box_style,
+                "box_color": box_color,
+                "font_size": font_size,
+                "margin_v": getattr(self, 'custom_margin_v', tk.IntVar(value=50)).get(),
+                "use_preset": False
+            }
+        
+        print(f"📤 Returning to video processor: {result}")
+        return result
+
     
+    def force_update_subtitle_config(self):
+        """Force update subtitle config từ GUI - Debug helper"""
+        if HAS_SUBTITLE_CONFIG and hasattr(self, 'subtitle_config'):
+            print("🔄 Force updating subtitle config from GUI...")
+            
+            # Clear current config
+            self.subtitle_config = SubtitleConfig()
+            
+            # Apply values từ GUI
+            self.subtitle_config.text_color = self.subtitle_text_color.get()
+            self.subtitle_config.box_style = self.subtitle_box_style.get()  
+            self.subtitle_config.box_color = self.subtitle_box_color.get()
+            self.subtitle_config.font_size = self.subtitle_font_size.get()
+            
+            print(f"✅ Updated config: color={self.subtitle_config.text_color}, style={self.subtitle_config.box_style}")
+            
+            # Update preview
+            self.update_subtitle_preview()
+
     def select_input_folder(self):
         """Chọn thư mục video đầu vào - MỚI"""
         folder_path = filedialog.askdirectory(
@@ -1201,9 +1378,9 @@ class VideoEditorGUI:
         advanced_mode_var.trace('w', toggle_advanced_mode)
 
         # --- Control buttons ---
-        button_frame = ttk.Frame(main_frame)
-        button_frame.pack(fill=tk.X, pady=(20, 0))
-        
+        button_frame = ttk.Frame(dialog)  # Gắn vào dialog, không phải main_frame
+        button_frame.pack(side=tk.BOTTOM, fill=tk.X, pady=10, padx=20)
+
         def save_video_overlay():
             try:
                 selected_video = video_var.get()
@@ -1599,6 +1776,8 @@ class VideoEditorGUI:
 
         threading.Thread(target=worker, daemon=True).start()
     
+    
+
 
 def main():
     root = tk.Tk()
