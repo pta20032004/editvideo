@@ -795,7 +795,7 @@ def add_multiple_images_with_animations(main_video_path, subtitle_path, output_p
             text_color="black",      # Sử dụng màu mới
             box_style="box",         # Sử dụng box thay vì outline
             box_color="white",       # Nền trắng
-            font_size=12,            # Font size lớn hơn một chút cho animation
+            font_size=10,            # Font size lớn hơn một chút cho animation
             margin_v=50
         )
         
@@ -919,7 +919,7 @@ def add_images_with_custom_timeline(main_video_path, subtitle_path, output_path,
                 text_color="black",      # Màu mới
                 box_style="box",         # Box thay vì outline
                 box_color="white",       # Nền trắng
-                font_size=12,            # Font size phù hợp
+                font_size=10,            # Font size phù hợp
                 margin_v=50
             )
             

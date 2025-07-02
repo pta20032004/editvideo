@@ -877,7 +877,7 @@ class VideoProcessor:
                     text_color="black",      # Màu mới
                     box_style="box",         # Box thay vì outline
                     box_color="white",       # Nền trắng
-                    font_size=8,             # Font size nhỏ cho ảnh overlay
+                    font_size=10,             # Font size nhỏ cho ảnh overlay
                     margin_v=100
                 )
                 
@@ -927,7 +927,7 @@ class VideoProcessor:
                     text_color="black",
                     box_style="box",
                     box_color="white", 
-                    font_size=8,
+                    font_size=10,
                     margin_v=150
                 )
                 

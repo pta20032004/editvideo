@@ -116,7 +116,13 @@ def batch_insert_image(base_folder_path: str,
         )
 
         if result_image:
-            output_filename = f"output_{success_count + 1}.png"
+            # --- THAY ĐỔI TẠI ĐÂY ---
+            # Tách tên file và phần mở rộng
+            file_name_without_ext, _ = os.path.splitext(filename)
+            # Tạo tên file mới
+            output_filename = f"{file_name_without_ext}_processed.png"
+            # --- KẾT THÚC THAY ĐỔI ---
+            
             output_path = os.path.join(output_folder_path, output_filename)
             result_image.save(output_path)
             success_count += 1

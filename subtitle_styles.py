@@ -56,7 +56,7 @@ SUBTITLE_PRESETS = {
         "box_style": "box",
         "box_color": "white",
         "font_name": "Arial",
-        "font_size": 10
+        "font_size": 8
     }
 }
 
